@@ -1,0 +1,28 @@
+#INFO("Using default values for experiment 05039 incoming Na beam (Hoffman 25O)");
+#INFO(" 28Ne --> 26Ne + 2n " );
+	eBeam           = 100.5;
+	beamA           = 29;
+	beamZ           = 11;
+	//dTarget         = 473.1;
+	dTarget         = 500.;
+	dEbeam          = 0.025;
+	resTime         = 0.3;
+	resTargetX      = 0.0007;
+	resCRDC1X      = 0.0013;
+	resCRDC1ThetaX = 0.0013;
+	resCRDC1Y      = 0.0013;
+	resCRDC1ThetaY = 0.0013;
+	nNeutr          = 0;
+	nProt           = 1;
+	bSpotDx         = 0.005; # sigma
+	bSpotDy         = 0.004;
+	bSpotDtx        = 0.009;
+	bSpotDty        = 0.0035;
+	bSpotCtx        = 0.008;                          
+	bSpotCx         = 0.00;                          
+	bSpotCty        = -0.001;                          
+	bSpotCy         = -0.001;                          
+	crdc1MaskLeft   =  0.15;                 
+	crdc1MaskRight  = -0.15;
+	crdc2dist       = 1.88;
+	monaDist        = 8.20;

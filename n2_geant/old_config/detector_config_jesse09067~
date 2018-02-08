@@ -1,0 +1,199 @@
+# This file controls the MoNA layer properties... you can have as many layers as you want.
+# Just add a line for each additional layer
+# Using r in the coordinate specifies "relative coordinates" which means relative to the
+# previous element... so you can specify the 1st layer's location relative to the target,
+# the second layer relative to the first, etc. Simply using a number uses the absolute coordinates
+# of the simulation
+# g will allow you to specify the "gap" between layers if you want - this is the measured
+# edge to edge value. It auto-sets the facing vector... you can override it by setting the vector though
+# !<Name> declares a new array.
+!target position (X Y Z in cm)
+0. 0. 0.
+# after the layer tag comes layer position, # of bars, facing, rotation, type, name (X Y Z in cm, integer, facing X Y Z, string, string) 
+!MoNA
+#Far MoNA-LISA Location - MoNA block, LISA split (5 bars, 53.5 cm, 4 bars, angle of 69 degrees) - JKS
+-12.0 0. 895. 16 0.0 0.0 -1.0 00.0 MoNABar A
+-12.0 0. 906. 16 0.0 0.0 -1.0 00.0 MoNABar B
+-12.0 0. 917. 16 0.0 0.0 -1.0 00.0 MoNABar C
+-12.0 0. 928. 16 0.0 0.0 -1.0 00.0 MoNABar D
+-12.0 0. 939. 16 0.0 0.0 -1.0 00.0 MoNABar E
+-12.0 0. 950. 16 0.0 0.0 -1.0 00.0 MoNABar F
+-12.0 0. 961. 16 0.0 0.0 -1.0 00.0 MoNABar G
+-12.0 0. 972. 16 0.0 0.0 -1.0 00.0 MoNABar H
+-12.0 0. 983. 16 0.0 0.0 -1.0 00.0 MoNABar I
+151.3 0.0 695.9 16 151.3 0.0 -395.9 00.0 MoNABar J
+155.2 0.0 706.2 16 155.2 0.0 -406.2 00.0 MoNABar K
+159.1 0.0 716.4 16 159.1 0.0 -416.4 00.0 MoNABar L
+163.1 0.0 726.7 16 163.1 0.0 -426.7 00.0 MoNABar M
+167.0 0.0 737.0 16 167.0 0.0 -437.0 00.0 MoNABar N
+190.0 0.0 797.2 16 190.0 0.0 -497.2 00.0 MoNABar O
+194.0 0.0 807.5 16 194.0 0.0 -507.5 00.0 MoNABar P
+197.9 0.0 817.8 16 197.9 0.0 -517.8 00.0 MoNABar Q
+201.8 0.0 828.1 16 201.8 0.0 -528.1 00.0 MoNABar R
+#Far MoNA-LISA Location - MoNA block, LISA block - JKS
+#0.0 0. 895. 16 0.0 0.0 -1.0 00.0 MoNABar A
+#0.0 0. 906. 16 0.0 0.0 -1.0 00.0 MoNABar B
+#0.0 0. 917. 16 0.0 0.0 -1.0 00.0 MoNABar C
+#0.0 0. 928. 16 0.0 0.0 -1.0 00.0 MoNABar D
+#0.0 0. 939. 16 0.0 0.0 -1.0 00.0 MoNABar E
+#0.0 0. 950. 16 0.0 0.0 -1.0 00.0 MoNABar F
+#0.0 0. 961. 16 0.0 0.0 -1.0 00.0 MoNABar G
+#0.0 0. 972. 16 0.0 0.0 -1.0 00.0 MoNABar H
+#0.0 0. 983. 16 0.0 0.0 -1.0 00.0 MoNABar I
+#0.0 0. 1013.5 16 0.0 0.0 -1.0 00.0 MoNABar J
+#0.0 0. 1024.5 16 0.0 0.0 -1.0 00.0 MoNABar K
+#0.0 0. 1035.5 16 0.0 0.0 -1.0 00.0 MoNABar L
+#0.0 0. 1046.5 16 0.0 0.0 -1.0 00.0 MoNABar M
+#0.0 0. 1057.5 16 0.0 0.0 -1.0 00.0 MoNABar N
+#0.0 0. 1111. 16 0.0 0.0 -1.0 00.0 MoNABar O
+#0.0 0. 1122. 16 0.0 0.0 -1.0 00.0 MoNABar P
+#0.0 0. 1133. 16 0.0 0.0 -1.0 00.0 MoNABar Q
+#0.0 0. 1144. 16 0.0 0.0 -1.0 00.0 MoNABar R
+#Alternate location of LISA2 -JKS
+#151.3 0.0 695.9 16 151.3 0.0 -395.9 00.0 MoNABar O
+#155.2 0.0 706.2 16 155.2 0.0 -406.2 00.0 MoNABar P
+#159.1 0.0 716.4 16 159.1 0.0 -416.4 00.0 MoNABar Q
+#163.1 0.0 726.7 16 163.1 0.0 -426.7 00.0 MoNABar R
+#Far MoNA-LISA Location - MoNA layered, LISA layered, in 3 layer sections - JKS
+#0.0 0. 895. 16 0.0 0.0 -1.0 00.0 MoNABar A
+#0.0 0. 906. 16 0.0 0.0 -1.0 00.0 MoNABar B
+#0.0 0. 917. 16 0.0 0.0 -1.0 00.0 MoNABar C
+#0.0 0. 947. 16 0.0 0.0 -1.0 00.0 MoNABar D
+#0.0 0. 958. 16 0.0 0.0 -1.0 00.0 MoNABar E
+#0.0 0. 969. 16 0.0 0.0 -1.0 00.0 MoNABar F
+#0.0 0. 999. 16 0.0 0.0 -1.0 00.0 MoNABar G
+#0.0 0. 1010. 16 0.0 0.0 -1.0 00.0 MoNABar H
+#0.0 0. 1021. 16 0.0 0.0 -1.0 00.0 MoNABar I
+#0.0 0. 1051. 16 0.0 0.0 -1.0 00.0 MoNABar J
+#0.0 0. 1062. 16 0.0 0.0 -1.0 00.0 MoNABar K
+#0.0 0. 1073. 16 0.0 0.0 -1.0 00.0 MoNABar L
+#0.0 0. 1103. 16 0.0 0.0 -1.0 00.0 MoNABar M
+#0.0 0. 1114. 16 0.0 0.0 -1.0 00.0 MoNABar N
+#0.0 0. 1125. 16 0.0 0.0 -1.0 00.0 MoNABar O
+#0.0 0. 1155. 16 0.0 0.0 -1.0 00.0 MoNABar P
+#0.0 0. 1166. 16 0.0 0.0 -1.0 00.0 MoNABar Q
+#0.0 0. 1177. 16 0.0 0.0 -1.0 00.0 MoNABar R
+#Far MoNA-LISA Location - MoNA block, LISA split in half, in 3 layer sections - JKS
+#-12.0 0. 895. 16 0.0 0.0 -1.0 00.0 MoNABar A
+#-12.0 0. 906. 16 0.0 0.0 -1.0 00.0 MoNABar B
+#-12.0 0. 917. 16 0.0 0.0 -1.0 00.0 MoNABar C
+#-12.0 0. 947. 16 0.0 0.0 -1.0 00.0 MoNABar D
+#-12.0 0. 958. 16 0.0 0.0 -1.0 00.0 MoNABar E
+#-12.0 0. 969. 16 0.0 0.0 -1.0 00.0 MoNABar F
+#-12.0 0. 999. 16 0.0 0.0 -1.0 00.0 MoNABar G
+#-12.0 0. 1010. 16 0.0 0.0 -1.0 00.0 MoNABar H
+#-12.0 0. 1021. 16 0.0 0.0 -1.0 00.0 MoNABar I
+#-12.0 0. 1051 16 0.0 0.0 -1.0 00.0 MoNABar J
+#-12.0 0. 1062 16 0.0 0.0 -1.0 00.0 MoNABar K
+#-12.0 0. 1073 16 0.0 0.0 -1.0 00.0 MoNABar L
+#-12.0 0. 1084 16 0.0 0.0 -1.0 00.0 MoNABar M
+#-12.0 0. 1095 16 0.0 0.0 -1.0 00.0 MoNABar N
+#151.3 0.0 695.9 16 151.3 0.0 -395.9 00.0 MoNABar O
+#155.2 0.0 706.2 16 155.2 0.0 -406.2 00.0 MoNABar P
+#159.1 0.0 716.4 16 159.1 0.0 -416.4 00.0 MoNABar Q
+#163.1 0.0 726.7 16 163.1 0.0 -426.7 00.0 MoNABar R
+#Close MoNA-LISA Location - MoNA block, LISA block - JKS
+#-12.0 0. 595. 16 0.0 0.0 -1.0 00.0 MoNABar A
+#-12.0 0. 606. 16 0.0 0.0 -1.0 00.0 MoNABar B
+#-12.0 0. 617. 16 0.0 0.0 -1.0 00.0 MoNABar C
+#-12.0 0. 628. 16 0.0 0.0 -1.0 00.0 MoNABar D
+#-12.0 0. 639. 16 0.0 0.0 -1.0 00.0 MoNABar E
+#-12.0 0. 650. 16 0.0 0.0 -1.0 00.0 MoNABar F
+#-12.0 0. 661. 16 0.0 0.0 -1.0 00.0 MoNABar G
+#-12.0 0. 672. 16 0.0 0.0 -1.0 00.0 MoNABar H
+#-12.0 0. 683. 16 0.0 0.0 -1.0 00.0 MoNABar I
+#-12.0 0. 713.5 16 0.0 0.0 -1.0 00.0 MoNABar J
+#-12.0 0. 724.5 16 0.0 0.0 -1.0 00.0 MoNABar K
+#-12.0 0. 735.5 16 0.0 0.0 -1.0 00.0 MoNABar L
+#-12.0 0. 746.5 16 0.0 0.0 -1.0 00.0 MoNABar M
+#-12.0 0. 757.5 16 0.0 0.0 -1.0 00.0 MoNABar N
+#-12.0 0. 811. 16 0.0 0.0 -1.0 00.0 MoNABar O
+#-12.0 0. 822. 16 0.0 0.0 -1.0 00.0 MoNABar P
+#-12.0 0. 833. 16 0.0 0.0 -1.0 00.0 MoNABar Q
+#-12.0 0. 844. 16 0.0 0.0 -1.0 00.0 MoNABar R
+#Far MoNA-LISA Location - split
+#-12.0 0. 895. 16 0.0 0.0 -1.0 00.0 MoNABar A
+#-12.0 0. 906. 16 0.0 0.0 -1.0 00.0 MoNABar B
+#-12.0 0. 917. 16 0.0 0.0 -1.0 00.0 MoNABar C
+#-12.0 0. 928. 16 0.0 0.0 -1.0 00.0 MoNABar D
+#-12.0 0. 939. 16 0.0 0.0 -1.0 00.0 MoNABar E
+#-12.0 0. 950. 16 0.0 0.0 -1.0 00.0 MoNABar F
+#-12.0 0. 961. 16 0.0 0.0 -1.0 00.0 MoNABar G
+#-12.0 0. 972. 16 0.0 0.0 -1.0 00.0 MoNABar H
+#-12.0 0. 983. 16 0.0 0.0 -1.0 00.0 MoNABar I
+#151.3 0.0 695.9 16 151.3 0.0 -395.9 00.0 MoNABar J
+#154.0 0.0 705.2 16 154.0 0.0 -405.2 00.0 MoNABar K
+#158.4 0.0 714.6 16 158.4 0.0 -414.6 00.0 MoNABar L
+#162.0 0.0 723.9 16 162.0 0.0 -423.9 00.0 MoNABar M
+#165.6 0.0 733.2 16 165.6 0.0 -433.2 00.0 MoNABar N
+#169.1 0.0 742.6 16 169.1 0.0 -442.6 00.0 MoNABar O
+#172.7 0.0 751.9 16 172.7 0.0 -451.9 00.0 MoNABar P
+#176.3 0.0 761.3 16 176.3 0.0 -461.3 00.0 MoNABar Q
+#179.8 0.0 770.6 16 179.8 0.0 -470.6 00.0 MoNABar R
+#Block MoNA-LISA location
+#-12.0 0. 895. 8 0.0 0.0 -1.0 00.0 MoNABar A
+#-12.0 0. 906. 8 0.0 0.0 -1.0 00.0 MoNABar B
+#-12.0 0. 917. 8 0.0 0.0 -1.0 00.0 MoNABar C
+#-12.0 0. 928. 8 0.0 0.0 -1.0 00.0 MoNABar D
+#-12.0 0. 939. 8 0.0 0.0 -1.0 00.0 MoNABar E
+#-12.0 0. 950. 8 0.0 0.0 -1.0 00.0 MoNABar F
+#-12.0 0. 961. 8 0.0 0.0 -1.0 00.0 MoNABar G
+#-12.0 0. 972. 8 0.0 0.0 -1.0 00.0 MoNABar H
+#-12.0 0. 983. 8 0.0 0.0 -1.0 00.0 MoNABar I
+#-12.0 0. 994. 8 0.0 0.0 -1.0 00.0 MoNABar J
+#-12.0 0. 1005. 8 0.0 0.0 -1.0 00.0 MoNABar K
+#-12.0 0. 1016. 8 0.0 0.0 -1.0 00.0 MoNABar L
+#-12.0 0. 1027. 8 0.0 0.0 -1.0 00.0 MoNABar M
+#-12.0 0. 1038. 8 0.0 0.0 -1.0 00.0 MoNABar N
+#-12.0 0. 1049. 8 0.0 0.0 -1.0 00.0 MoNABar O
+#-12.0 0. 1060. 8 0.0 0.0 -1.0 00.0 MoNABar P
+#-12.0 0. 1071. 8 0.0 0.0 -1.0 00.0 MoNABar Q
+#-12.0 0. 1082. 8 0.0 0.0 -1.0 00.0 MoNABar R
+#Present MoNA-LISA Location - MoNA block, LISA block
+#-12.0 0. 595. 16 0.0 0.0 -1.0 00.0 MoNABar A
+#-12.0 0. 606. 16 0.0 0.0 -1.0 00.0 MoNABar B
+#-12.0 0. 617. 16 0.0 0.0 -1.0 00.0 MoNABar C
+#-12.0 0. 628. 16 0.0 0.0 -1.0 00.0 MoNABar D
+#-12.0 0. 639. 16 0.0 0.0 -1.0 00.0 MoNABar E
+#-12.0 0. 650. 16 0.0 0.0 -1.0 00.0 MoNABar F
+#-12.0 0. 661. 16 0.0 0.0 -1.0 00.0 MoNABar G
+#-12.0 0. 672. 16 0.0 0.0 -1.0 00.0 MoNABar H
+#-12.0 0. 683. 16 0.0 0.0 -1.0 00.0 MoNABar I
+#151.3 0.0 395.9 16 151.3 0.0 -395.9 00.0 MoNABar J
+#154.0 0.0 405.2 16 154.0 0.0 -405.2 00.0 MoNABar K
+#158.4 0.0 414.6 16 158.4 0.0 -414.6 00.0 MoNABar L
+#162.0 0.0 423.9 16 162.0 0.0 -423.9 00.0 MoNABar M
+#165.6 0.0 433.2 16 165.6 0.0 -433.2 00.0 MoNABar N
+#169.1 0.0 442.6 16 169.1 0.0 -442.6 00.0 MoNABar O
+#172.7 0.0 451.9 16 172.7 0.0 -451.9 00.0 MoNABar P
+#176.3 0.0 461.3 16 176.3 0.0 -461.3 00.0 MoNABar Q
+#179.8 0.0 470.6 16 179.8 0.0 -470.6 00.0 MoNABar R
+#Close MoNA-LISA Location - MoNA block, LISA split (5 bars, 53.5 cm, 4 bars, angle of 69 degrees) - JKS
+#-12.0 0. 595. 16 0.0 0.0 -1.0 00.0 MoNABar A
+#-12.0 0. 606. 16 0.0 0.0 -1.0 00.0 MoNABar B
+#-12.0 0. 617. 16 0.0 0.0 -1.0 00.0 MoNABar C
+#-12.0 0. 628. 16 0.0 0.0 -1.0 00.0 MoNABar D
+#-12.0 0. 639. 16 0.0 0.0 -1.0 00.0 MoNABar E
+#-12.0 0. 650. 16 0.0 0.0 -1.0 00.0 MoNABar F
+#-12.0 0. 661. 16 0.0 0.0 -1.0 00.0 MoNABar G
+#-12.0 0. 672. 16 0.0 0.0 -1.0 00.0 MoNABar H
+#-12.0 0. 683. 16 0.0 0.0 -1.0 00.0 MoNABar I
+#151.3 0.0 395.9 16 151.3 0.0 -395.9 00.0 MoNABar J
+#155.2 0.0 406.2 16 155.2 0.0 -406.2 00.0 MoNABar K
+#159.1 0.0 416.4 16 159.1 0.0 -416.4 00.0 MoNABar L
+#163.1 0.0 426.7 16 163.1 0.0 -426.7 00.0 MoNABar M
+#167.0 0.0 437.0 16 167.0 0.0 -437.0 00.0 MoNABar N
+#190.0 0.0 497.2 16 190.0 0.0 -497.2 00.0 MoNABar O
+#194.0 0.0 507.5 16 194.0 0.0 -507.5 00.0 MoNABar P
+#197.9 0.0 517.8 16 197.9 0.0 -517.8 00.0 MoNABar Q
+#201.8 0.0 528.1 16 201.8 0.0 -528.1 00.0 MoNABar R
+#Block MoNA-LISA location - 05039 location - JKS
+#0.0 0. 820. 8 0.0 0.0 -1.0 00.0 MoNABar A
+#0.0 0. 831. 8 0.0 0.0 -1.0 00.0 MoNABar B
+#0.0 0. 842. 8 0.0 0.0 -1.0 00.0 MoNABar C
+#0.0 0. 853. 8 0.0 0.0 -1.0 00.0 MoNABar D
+#0.0 0. 864. 8 0.0 0.0 -1.0 00.0 MoNABar E
+#0.0 0. 875. 8 0.0 0.0 -1.0 00.0 MoNABar F
+#0.0 0. 886. 8 0.0 0.0 -1.0 00.0 MoNABar G
+#0.0 0. 897. 8 0.0 0.0 -1.0 00.0 MoNABar H
+#0.0 0. 908. 8 0.0 0.0 -1.0 00.0 MoNABar I

@@ -1,0 +1,2064 @@
+/// \file
+#include <TTree.h> 
+#include <TFile.h> 
+#include <TString.h> 
+#include "TObjString.h"
+#include <iostream>
+#include <fstream>
+#include <vector>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <math.h>
+#include <gsl/gsl_sf_bessel.h>
+#include "deb_err.h"
+#include "st_ble.hh"
+#include "st_propagate.hh"
+#include "st_particle.hh"
+#include "st_system.hh"
+#include "st_part_init.hh"
+#include "st_material.hh"
+#include "st_par_mat_ia.hh"
+#include "st_reaction.hh"
+#include "st_histo_tuple.hh"
+#include "st_aperture.hh"
+#include "st_histo_tuple.hh"
+
+
+using namespace std;
+
+void usage() {
+  printf(""
+	 "usage: \n"
+	 "       \n"
+	 " -v     Run verbose\n"
+	 " -n     Set number of events\n"                                                    // 1
+	 " -f     Set output file name.  Extension determines file type.\n"                  // 2
+	 "          root   -> ROOT file\n"
+	 "          gsltup -> GSL n-tuple (also a file *.gsltup.dsc is written, describing the columns)\n"
+	 " -geant Cause st_mona to write out neutron energy & angles to an ASCII file\n"
+	 " -reac  Set reaction model\n"
+	 "         glaub    (normal fragmentation w/ glauber kick)\n"
+	 "         2neutron (2 neutron sequential decay w/ glauber kick)\n"
+	 "         di_neutron (di_neutron emission and decay w/ glauber kick) set -e fro decay of the frag-dineutron system and -e1 for decay of the dineutron (n-n)\n"
+	 "                                                                    or use the Volya_dineutron decay description (set as -e)"
+	 "         3body_decay (3body decay w/ glauber kick) set -e for decay of the frag-n-n system\n"
+	 "         2body    <Q-value> <Q-value spread> (two-body stripping)\n"
+	 "                            n .b. spread is relative, e.g. 0.1 = 10%% spread\n"
+	 "                            defaults to 0.4 rad cone in CoM\n"
+	 " -reacA  Set what kind of angular distribution (theta) you want for 2body rxn @ target\n"
+	 "	  flat <lower-lim (rad)> <upper-lim (rad)>  flat distribution.\n"
+	 "	  gauss <width (rad)> <lower-lim (rad)> <upper-lim (rad)>  gaussian distribution.\n"
+	 "	  COSgauss <width (rad)> <lower-lim (rad)> <upper-lim (rad)>  gaussian distribution in cosine instead of angle.\n"
+	 "         NOTE: in spherical polar coordinates, theta goes from 0 to pi! Set your ranges accordingly\n"
+	 " -debug  print to screen out a parameter for debugging purposes. Specified through an argument.\n"
+	 "         qValue   spits out the q-value being used for reaction in target for 2body\n"
+	 "         exen   spits out the excitatin energy being used for neutron evaporation\n"
+	 "         thetaCMP spits out the projectile theta in COM being used for a 2body reaction in target\n"
+	 "         phiCMP spits out the projectile phi in COM being used for a 2body reaction in target\n"
+	 "         thetaLABP spits out the projectile theta in lab frame being used for reaction in target\n"
+	 "         phiLABP spits out the projectile phi in lab frame being used for reaction in target\n"
+	 "         NOTE: if you want to use this to generate a histogram from a file, you need to redirect\n"
+	 "             the standard output of the program. Do this by putting the following after all flags:\n"
+	 "             > filename\n"
+	 " -Momentum <para/perp> <filename> set the para/perp momentum distribution of the excited system"
+	 " -e      Set decay energy model and parameters for the total decay(MeV)\n"                             // 3
+	 "          const           <energy>\n"
+	 "          exp             <exp coeffic.>\n"
+	 "          therm           <temp>\n"
+	 "          Etotal_11Li     <Eb> For documentation see Nuclear Physics A 673 (2000) 143-156\n"
+	 "          E_12Li          <Eb> For documentation see Nuclear Physics A 673 (2000) 143-156\n"
+	 "          uniform         <e-low> <e-high>\n"
+	 "          e1              <e-low> <e-high>\n"
+	 "          gauss           <centr> <sigma>\n"
+	 "          swave           <Eb> <scatlength>  ##changed zwk such input if neutron seperation energy (MeV) rather than gamma\n"
+	 "          bw              <centr> <gamma>\n"
+	 "          asymbw          <energy> <obsWidth> <angMom> <flagGamma>, flagGamma = 0 -> Observed Width, flagGamma = 1 -> Reduced Width\n"
+	 "          TwoNeutron_seq  <TotalDecayCentroid> <TotalWidth> <FirstDecayWidth> <2ndDecayCentoid> <SecondDecayWidth> <angMom>, for documentation see Phys Rev Lett,Vol.74 #6, Two-Proton Emission..\n"
+	 "          Volya_2nSeq     <EnergyInitialState> <IntermediateStateEnery> <SF I->V> <SF V->F> <angMom> <Gamma Initial State>\n"
+	 "                             **if IntermediateStateEnergy is negative and L=0 then assumes input a scattering length (fm)\n"
+	 "          Volya_Dineutron     <EnergyInitialState> <Gamma Initial State> <scattering length (-fm)>\n"
+	 " -e1     Set decay energy model and parameters for the first decay in the 2 neutron sequential decay(MeV)\n"                             // 3
+	 "          const           <energy>\n"
+	 "          exp             <exp coeffic.>\n"
+	 "          therm           <temp>\n"
+	 "          Etotal_11Li     <Eb> For documentation see Nuclear Physics A 673 (2000) 143-156\n"
+	 "          E_12Li          <Eb> For documentation see Nuclear Physics A 673 (2000) 143-156\n"
+	 "          uniform         <e-low> <e-high>\n"
+	 "          e1              <e-low> <e-high>\n"
+	 "          gauss           <centr> <sigma>\n"
+	 "          swave           <Eb> <scatlength>\n"
+	 "          bw              <centr> <gamma>\n"
+	 "          asymbw          <energy> <obsWidth> <angMom> <flagGamma>, flagGamma = 0 -> Observed Width, flagGamma = 1 -> Reduced Width\n"
+	 "	   cos_twoneutron  No flags necessary, it picks a random number between 0 and 1 that look an arccos(theta) and multiplies the total by that value.\n"
+	 " -e2     Set decay energy model and parameters for the second decay in the 2 neutron sequential decay(MeV)\n"                             // 3
+	 "          const           <energy>\n"
+	 "          exp             <exp coeffic.>\n"
+	 "          therm           <temp>\n"
+	 "          Etotal_11Li     <Eb> For documentation see Nuclear Physics A 673 (2000) 143-156\n"
+	 "          E_12Li          <Eb> For documentation see Nuclear Physics A 673 (2000) 143-156\n"
+	 "          uniform         <e-low> <e-high>\n"
+	 "          e1              <e-low> <e-high>\n"
+	 "          gauss           <centr> <sigma>\n"
+	 "          swave           <Eb> <scatlength>\n"
+	 "          bw              <centr> <gamma>\n"
+	 "          asymbw          <energy> <obsWidth> <angMom> <flagGamma>, flagGamma = 0 -> Observed Width, flagGamma = 1 -> Reduced Width\n"
+	 "	   cos_twoneutron  No flags necessary, it picks a random number between 0 and 1 that look an arccos(theta) and multiplies the total decay by that value.\n"
+	 " -be   Set beam energy per A\n"                                                   // 4
+	 " -bZ   Set beam Z\n"                                                              // 5
+	 " -bA   Set beam A\n"                                                              // 6
+	 " -dT   Set target thickness\n"                                                    // 7
+	 " -dbe  Set relative beam energy spread (sigma)\n"                                 // 8
+	 " -rTx  Set resolution of target-x\n"                                              // 9 
+	 " -rt   Set time resolutions (ns)\n"                                               //10
+	 " -rx  Set resolution of CRDC1 x (m)\n"                                            //11
+	 " -ry  Set resolution of CRDC1 y (m)\n"  
+	 " -rthx  Set resolution of CRDC1 theta x (rad)\n"                                  //12
+	 " -rthy  Set resolution of CRDC1 theta y (rad)\n"                                  
+	 " -rMx1  Set 1st resolution of MoNA x \n"
+	 " -rMx2  Set 2nd resolution of MoNA x \n"
+	 " -rMxP  Set P-resolution of MoNA x \n"
+	 " -rMyz Switch MoNA Y and Z discretization on/off (1/0)\n"                         //14
+	 " -strag scale\n"                                                                  //15
+	 " -glaub scale\n"                                                                  //16
+	 " -np   number of removed protons\n"                                               //17
+	 " -nn   number of removed neutrons\n"                                              //18
+	 " -md   distance to MoNA (middle of A8)\n"                                         //19
+	 " -cmL  position of left  edge of blocker (before CRDC1)\n"                        //21 
+	 " -cmR  position of right edge of blocker (before CRDC1)\n"                        //22 
+	 " -c2d  distance between CRDC1 and CRDC2 (meters)\n"                               //23
+	 " -ctx  centroid of x angle in radians \n"                                         //24 
+	 " -cx   centroid of x position in meters \n"                                       //25 
+	 " -cty  centroid of y angle in radians \n"                                         //26 
+	 " -cy   centroid of y position in meters \n"                                       //27 
+	 " -dtx  sigma of x angle (rad) \n"                                                 //28 
+	 " -dx   sigma of x posn (m) \n"                                                    //29  
+	 " -dty  sigma of y angle (rad) \n"                                                 //30 
+	 " -dy   sigma of y posn (m) \n"                                                    //31 
+	 " -disTyp type of MoNA X distribution\n"                                           //32
+	 " -velocityshift scale \n"                                                         //33
+	 " -asymMomentum scale\n"                                                           //34
+	 " -exp  <exp number>  set default values for experiment <exp number> \n"           //20
+	 "          03033 - Nathan's 23O, 22O\n"
+	 "          03038 - Kiss 7He\n"
+	 "          03038a - 7He no target"
+	 "          03048a - 12Be g.s. to 10Be\n"
+	 "          03048b - 11Be Coul to 10Be\n"
+	 "          05034a - 14B --> 11Li + n\n"
+	 "          05034_Be - 14Be --> 11Li + n\n"
+	 "          05039  - Hoffman 25O\n"
+	 "          05039a - Hoffman 24O\n"
+	 "          05039b - Hoffman 23O\n"
+	 "          05039c - Hoffman 26F\n"
+	 "          05124a - Fragmentation 20O\n"
+	 "          05124b - Fragmentation 13B\n"
+	 "          05124c - Fragmentation 25Ne\n"
+	 "          05124d - Fragmentation 16C\n"
+	 "          05124e - Fragmentation 19O\n"
+	 "          05124_Li9  - Fragmentation Li9\n"
+	 "          05124_O18 - Fragmentation 18O\n"
+	 "          05124_O19 - Fragmentation 19O\n"
+	 "          05124_O20 - Fragmentation 20O\n"
+	 "          05124_O21 - Fragmentation 21O\n"
+	 "          05124_O22 - Fragmentation 22O\n"
+	 "	   06025_B16 - B16, production data\n" 
+	 "          06025_Be16 - B17-beam, Be16->Be14+2n\n"
+
+	 //"\n"
+         );
+  exit(0);
+}
+
+int main (size_t argc, char** argv) {
+  //get location of executable so we can find input files
+  string execloc = argv[0];
+  short execlength = 7;
+  execloc.erase(execloc.length() - execlength, execlength);
+
+  /*--------------*/
+  int nevents=1;                                              // number of events to simulate
+  string tupleFile = execloc + "../root_files/st_mona.root";  //
+  string exType ="uniform";                                   // Type of RNG for first (1 neutron decay) or total (2 neutron decay) decay energy 
+  double exPar[10];                                           // parameters for RNG for excitation energy
+  exPar[0] = 0;                                               //
+  exPar[1] = 5;                                               //
+  exPar[2] = 0;                                               //
+  exPar[3] = 5;                                               //
+  exPar[4] = 5;                                               //
+  int exParInt[2];                                            // Param for RNG asymbw ang mom or 2 neutron decay
+  exParInt[0] = 10;                                           //
+  exParInt[1] = 0;                                            //
+  //-----------------------Parameters for 2 neutron decay JDS 08/2009----------------------//
+  string exType1="uniform";                                   // Type of RNG for first neutron decay energy, in 2 neutron decay
+  double exPar1[10];                                          // parameters for RNG for excitation energy
+  exPar1[0] = 0;                                              //
+  exPar1[1] = 5;                                              // 
+  int exPar1Int[2];                                           // Param for RNG asymbw ang mom or 2 neutron decay
+  exPar1Int[0] = 10;                                          //
+  exPar1Int[1] = 0;                                           //
+  string exType2="uniform";                                   // Type of RNG for second neutron decay energy, in 2 neutron decay
+  double exPar2[10];                                          // parameters for RNG for excitation energy
+  exPar2[0] = 0;                                              //
+  exPar2[1] = 5;                                              //
+  int exPar2Int[2];                                           // Param for RNG asymbw ang mom or 2 neutron decay
+  exPar2Int[0] = 10;                                          //
+  exPar2Int[1] = 0;                                           //
+  int DecayOneFilled = 0;                                     // Flag to show that the first decay energy has been filled
+  int DecayTwoFilled = 0;                                     // Flag to show that the second decay energy has been filled
+  int DecayTotalFilled = 0;                                   // Flag to show that the total decay energy has been filled
+  string WhichEnergyIsReconstruct = "ReconstructTotalEnergy"; //
+  
+  string cust_file;      //added by SMM on 10/16/06 for custom excitation energy lineshape
+  string cust_file1;      //added by SMM on 10/16/06 for custom excitation energy lineshape
+  string cust_file2;      //added by SMM on 10/16/06 for custom excitation energy lineshape
+  //-----------------------End of new parameters for 2 neutron decay-----------------------//
+  TString momType = "";
+  string momFile = "";
+  bool   verbose = false;                                     //
+  bool   geant = false;                                       //
+  string reacType = "glaub";                                  //2body
+  double reacQval=0;                                          //2body
+  double reacQvalSpread=0;                                    //2body
+  string aDistType = "flat";                                  //2body
+  string debugSwitch = "none";				      //for debugging output
+  double reacASpread=0.;                                      //2body
+  double reacALowLim=0.;                                      //2body
+  double reacAUpLim=0.4;                                      //2body
+  double eBeam=86;                                            //
+  double dEbeam=.03;                                          // relative beam energy spread (sigma)                         
+  double dTarget=722;                                         // (mg/cm^2)							  
+  double resTime=.1;                                          // (ns)
+  double resTargetX=.0007;                                    // (m)
+  double resCRDC1X=.0013;                                     // (m)
+  double resCRDC1Y=.0013;                                     // (m)
+  double resCRDC1ThetaX=.001;                                 // (rad)
+  double resCRDC1ThetaY=.001;                                 // (rad)
+  double resMonaX1=0.162;                                     // For Double Laplace
+  double resMonaX2=0.0233;                                    // For Double Laplace
+  double resMonaP=0.534;                                      // Fraction for resMonaX1 i.e. 66% is X1 34% X1
+  int    resMonaBar=1;                                        // flag to discretize y and randomize z
+  int    beamA=26;                                            //
+  int    beamZ=10;                                            //
+  double scaleGlaub = 1;                                      //
+  double scaleStrag = 1;                                      //
+  int    nNeutr=0;                                            // neutrons removed in reaction
+  int    nProt=2;                                             // protons  removed in reaction
+  double bSpotDx  = 0.005;                                    //
+  double bSpotDy  = 0.012;                                    //
+  double bSpotDtx = 0.01;                                     //
+  double bSpotDty = 0.0015;                                   //
+  double bSpotCtx = 0.0;                                      //
+  double bSpotCx = 0.0;                                       //
+  double bSpotCty = 0.0;                                      //
+  double bSpotCy = 0.0;                                       //
+  double crdc2dist = 1.00;                                    // distance between CRDC1 and 2
+  double monaDist = 8.17;                                     // distance to middle of A8
+  double crdc1MaskLeft  =  0.15;                              //
+  double crdc1MaskRight = -0.15;                              // 
+  double crdc2MaskLeft  =  0.15;                              //
+  double crdc2MaskRight = -0.15;                              // 
+  double crdc2MaskTop  =  0.15;                              //
+  double crdc2MaskBot = -0.15;                              // 
+  double distTypeMx = 0;                                      //
+  double velocityshift = 1.0;                                 //
+  double asymMomentum = 1.0;                                    //
+  string exp = "03033";                                            //
+
+  printf("\nProgram Simple-Track (st)        Heiko Scheit (scheit@nscl.msu.edu)\n");
+  printf("Compiled on " __DATE__ " at " __TIME__ ".\n\n");
+
+  for (size_t i=1; i < argc; i++) {
+    string sw=argv[i];  // SWitch
+    if (0) ;
+    else if (sw == "createinputfile") {
+      ofstream myfile;
+      myfile.open ("input.txt");
+      myfile << "Writing this to a file.\n";
+      myfile.close();
+      exit(0);
+    }
+    else if (sw == "inputfile") {
+      ofstream myfile;
+      myfile.open ("input.txt");
+      myfile << "Writing this to a file.\n";
+      myfile.close();
+      exit(0);
+    }
+    else if (sw == "-v")     verbose    = true;
+    else if (sw == "-n")     nevents    = atoi(argv[++i]);      // 1
+    else if (sw == "-f")     tupleFile  = argv[++i];       // 2
+    else if (sw == "-geant") geant      = true;
+    else if (sw == "-Momentum"){
+      momType = argv[++i];
+      momFile = argv[++i];
+    }
+    else if (sw == "-reac") {
+      reacType = argv[++i];
+      if (reacType == "2body") {
+	reacQval = atof(argv[++i]);         //set Q-value
+	reacQvalSpread = atof(argv[++i]);   //set relative Q-value spread
+      } else if (reacType == "glaub") {
+	//do nothing
+      } else if (reacType == "2neutron" || reacType == "di_neutron" || reacType == "3body_decay") {
+	//do nothing
+      } else {
+	ERR("Unkown reaction type %s", reacType.c_str());
+      }
+    }
+    else if (sw == "-reacA") {
+      aDistType = argv[++i];
+      if (aDistType == "flat") {
+	reacALowLim = atof(argv[++i]);         //set angle low lim
+	reacAUpLim = atof(argv[++i]);   //set angle upper lim
+      } else if (aDistType == "gauss" || aDistType == "COSgauss") {
+	reacASpread = atof(argv[++i]);   //set angle spread (rad)
+	reacALowLim = atof(argv[++i]);         //set angle low lim (rad)
+	reacAUpLim = atof(argv[++i]);   //set angle upper lim (rad)
+      } else {
+	ERR("Unkown distribution type %s", aDistType.c_str());
+      }
+
+      //check for proper ranges
+      if (reacALowLim < 0.0 || reacAUpLim > 3.1416)
+	ERR("Bad reacA ranges. Biggest possible range is 0.0 to Pi");
+
+    }
+    else if (sw == "-debug") {
+      debugSwitch = argv[++i];
+    }
+    else if (sw == "-e") {                                     // 3
+      DecayTotalFilled = 1;
+      exType = argv[++i];
+      if (exType == "const" || exType == "therm" || exType == "exp" || exType == "Etotal_11Li" || exType == "E_12Li")   
+        exPar[0] = atof(argv[++i]); // constant decay energy or temperature or exp coeffic.
+      else if (exType == "uniform" || exType == "gauss" || exType == "bw" || exType== "e1" || exType=="swave") {
+        exPar[0] = atof(argv[++i]); // lower bound or centroid or E1-threshold or energy
+        exPar[1] = atof(argv[++i]); // upper bound, sigma, or gamm
+      } else if (exType == "asymbw"){
+	exPar[0] = atof(argv[++i]); // Decay energy
+	exPar[1] = atof(argv[++i]); // Observed width
+	exParInt[0] = atof(argv[++i]); // ang momentum of state
+	exParInt[1] = atof(argv[++i]); // Gamma Flag
+      } else if (exType == "cust"){
+	cust_file = argv[++i];
+      } else if (exType == "TwoNeutron_seq"){
+	exPar[0] = atof(argv[++i]); // Total Decay Energy Centroid
+	exPar[1] = atof(argv[++i]); // Total Decay Reduced Width
+	exPar[2] = atof(argv[++i]); // 1st Decay Reduced Width
+	exPar[3] = atof(argv[++i]); // 2nd Neutron Decay Energy Centroid
+	exPar[4] = atof(argv[++i]); // 2nd Decay Reduced Width
+	exParInt[0] = atof(argv[++i]); // ang momentum of state
+      } else if (exType == "Volya_2nSeq"){
+	exPar[0] = atof(argv[++i]); // Energy of Initial State
+	exPar[1] = atof(argv[++i]); // Threshold Energy
+	exPar[2] = atof(argv[++i]); // Spec. Factor for I->V
+	exPar[3] = atof(argv[++i]); // Spec. Factor for V->F
+	exParInt[0] = atof(argv[++i]); // ang momentum
+	exPar[4] = atof(argv[++i]); // Gamma (width) of initial state
+      } else if (exType == "Volya_Dineutron"){
+	exPar[0] = atof(argv[++i]);    // Energy of Initial State
+	exPar[1] = atof(argv[++i]);    // Gamma (widht) of inital state
+	exPar[2] = atof(argv[++i]);    // scattering length of n-n, should be negative (-18.7 fm)
+      } else {
+        ERR("Unknown excitation energy model %s", exType.c_str());
+      }
+    }
+    else if (sw == "-e1") {                                     // 3
+      DecayOneFilled = 1;
+      exType1 = argv[++i];
+      if (exType1 == "const" || exType1 == "therm" || exType1 == "exp" || exType1 == "Etotal_11Li" || exType1 == "E_12Li") {
+        exPar1[0] = atof(argv[++i]); // constant decay energy or temperature or exp coeffic.
+      } else if (exType1 == "uniform" || exType1 == "gauss" || exType1 == "bw" || exType1 == "e1" || exType1=="swave") {
+        exPar1[0] = atof(argv[++i]); // lower bound or centroid or E1-threshold or energy
+        exPar1[1] = atof(argv[++i]); // upper bound, sigma, or gamm
+      } else if (exType1 == "asymbw"){
+	exPar1[0] = atof(argv[++i]); // Decay energy
+	exPar1[1] = atof(argv[++i]); // Observed width
+	exPar1Int[0] = atof(argv[++i]); // ang momentum of state
+	exPar1Int[1] = atof(argv[++i]); // Gamma Flag
+      } else if (exType1 == "cust"){
+	cust_file1 = argv[++i];
+      } else if (exType1 == "cos_twoneutron"){
+      } else {
+        ERR("Unknown excitation energy model %s", exType1.c_str());
+      }
+    }
+    else if (sw == "-e2") {                                     // 3
+      DecayTwoFilled = 1;
+      exType2 = argv[++i];
+      if (exType2 == "const" || exType2 == "therm" || exType2 == "exp" || exType2 == "Etotal_11Li" || exType2 == "E_12Li")   
+        exPar2[0] = atof(argv[++i]); // constant decay energy or temperature or exp coeffic.
+      else if (exType2 == "uniform" || exType2 == "gauss" || exType2 == "bw" || exType2 == "e1" || exType2=="swave") {
+        exPar2[0] = atof(argv[++i]); // lower bound or centroid or E1-threshold or energy
+        exPar2[1] = atof(argv[++i]); // upper bound, sigma, or gamm
+      } else if (exType2 == "asymbw"){
+	exPar2[0] = atof(argv[++i]); // Decay energy
+	exPar2[1] = atof(argv[++i]); // Observed width
+	exPar2Int[0] = atof(argv[++i]); // ang momentum of state
+	exPar2Int[1] = atof(argv[++i]); // Gamma Flag
+      } else if (exType2 == "cust"){
+	cust_file2 = argv[++i];
+      } else if (exType2 == "cos_twoneutron"){
+      } else {
+        ERR("Unknown excitation energy model %s", exType2.c_str());
+      }
+    }
+    else if (sw == "-be")      eBeam            = atof(argv[++i]);      // 4
+    else if (sw == "-bA")      beamA            = atoi(argv[++i]);      // 5
+    else if (sw == "-bZ")      beamZ            = atoi(argv[++i]);      // 6 
+    else if (sw == "-dT")      dTarget          = atof(argv[++i]);      // 7
+    else if (sw == "-dbe")     dEbeam           = atof(argv[++i]);      // 8
+    else if (sw == "-rt")      resTime          = atof(argv[++i]);      //09
+    else if (sw == "-rTx")     resTargetX       = atof(argv[++i]);      //10
+    else if (sw == "-rx")      resCRDC1X        = atof(argv[++i]);      //11
+    else if (sw == "-ry")      resCRDC1Y        = atof(argv[++i]);      //11
+    else if (sw == "-rthx")    resCRDC1ThetaX   = atof(argv[++i]);      //12
+    else if (sw == "-rthy")    resCRDC1ThetaY   = atof(argv[++i]);      //12
+    else if (sw == "-rMx1")    resMonaX1        = atof(argv[++i]);      //13
+    else if (sw == "-rMx2")    resMonaX2        = atof(argv[++i]);      //13
+    else if (sw == "-rMxP")    resMonaP         = atof(argv[++i]);      //13
+    else if (sw == "-rMyz")    resMonaBar       = atoi(argv[++i]);      //14 
+    else if (sw == "-strag")   scaleStrag       = atof(argv[++i]);      //15
+    else if (sw == "-glaub")   scaleGlaub       = atof(argv[++i]);      //16 
+    else if (sw == "-nn")      nNeutr           = atoi(argv[++i]);      //17
+    else if (sw == "-np")      nProt            = atoi(argv[++i]);      //18
+    else if (sw == "-md")      monaDist         = atof(argv[++i]);      //19
+    else if (sw == "-cmL")     crdc1MaskLeft    = atof(argv[++i]);      //21
+    else if (sw == "-cmR")     crdc1MaskRight   = atof(argv[++i]);      //22
+    else if (sw == "-c2d")     crdc2dist        = atof(argv[++i]);      //23
+    else if (sw == "-ctx")     bSpotCtx         = atof(argv[++i]);      //24   //
+    else if (sw == "-cx")      bSpotCx          = atof(argv[++i]);      //25   //
+    else if (sw == "-cty")     bSpotCty         = atof(argv[++i]);      //26   //
+    else if (sw == "-cy")      bSpotCy          = atof(argv[++i]);      //27   //
+    else if (sw == "-dtx")     bSpotDtx         = atof(argv[++i]);      //28   //
+    else if (sw == "-dx")      bSpotDx          = atof(argv[++i]);      //29   //
+    else if (sw == "-dty")     bSpotDty         = atof(argv[++i]);      //30   //
+    else if (sw == "-dy")      bSpotDy          = atof(argv[++i]);      //31   //
+    else if (sw == "-disType") distTypeMx       = atof(argv[++i]);      //32
+    else if (sw == "-velocityshift") velocityshift       = atof(argv[++i]);      //33
+    else if (sw == "-asymMomentum")  asymMomentum       = atof(argv[++i]);      //34
+    else if (sw == "-exp") {   exp              = argv[++i];// set default values for certain experiment   //20
+
+
+      if (0) ;
+      else if ( exp == "03033") ;  // Nathans exp; nothing todo, corresponds to global default
+      else if ( exp == "03038") {  // Kiss 7He
+	INFO("Using default values for experiment 03038 (Kiss 7He)");
+        eBeam           = 41.23 ; //40.8; --Changed by GAC, 24 Oct 2007
+        beamA           = 8;
+        beamZ           = 3;
+        dTarget         = 192.2; // from T. Baumann Oct 2006
+        dEbeam          = 0.006 ; 
+        resTime         = .3;
+        resTargetX      = 0.0014; //1.; --Changed by GAC, 24 Oct 2007
+        //resCRDC1XY      = 1.;
+        //resCRDC1ThetaXY = 1.;
+        //resMonaX        = 1.;
+        //resMonaBar      = 1; 
+        nNeutr          = 0;
+        nProt           = 1;
+	// 	bSpotCx         = 0.0011; //0.0; --Changed by GAC, 24 Oct 2007
+	//	bSpotCtx        = 0.0069; //0.0; --Changed by GAC, 24 Oct 2007
+	//	bSpotCy         = 0.0176; //0.0; --Changed by GAC, 24 Oct 2007
+	//	bSpotCty        = 0.0129; //0.0; --Changed by GAC, 24 Oct 2007
+	//      bSpotDx         = 0.0083; //0.004; // sigma from D. Denby Oct 11,2006
+	//      bSpotDtx        = 0.0637; //0.011; // sigma from D. Denby Oct 11,2006
+	//      bSpotDy         = 0.0411; //0.008; // sigma from D. Denby Oct 11,2006
+	//      bSpotDty        = 0.0579; //0.005; // sigma from D. Denby Oct 11,2006
+ 	bSpotCx         = 0.00061; // --Changed by A.Spyrou, 19 March 2008, numbers from PDY experimental forward tracking
+	bSpotCtx        = -0.00325; // --Changed by A.Spyrou, 19 March 2008
+	bSpotCy         = -0.00015; // --Changed by A.Spyrou, 19 March 2008
+	bSpotCty        = 0.00068; // --Changed by A.Spyrou, 19 March 2008
+        bSpotDx         = 0.00392; // --Changed by A.Spyrou, 19 March 2008
+        bSpotDtx        = 0.01023; // --Changed by A.Spyrou, 19 March 2008
+        bSpotDy         = 0.00674; // --Changed by A.Spyrou, 19 March 2008
+        bSpotDty        = 0.00278; // --Changed by A.Spyrou, 19 March 2008
+        crdc1MaskLeft   =  0.073 ; // --Changed by A.Spyrou, 19 March 2008
+        crdc1MaskRight  = -0.15;
+        crdc2dist       = 1.00;
+        monaDist        = 8.20;
+      }   else if ( exp == "03038a") {  // Kiss 7He No Target
+        INFO("Using default values for experiment 03038 (7He NO TARGET)");
+        eBeam           = 40.0;
+        beamA           = 9;
+        beamZ           = 3;
+        dTarget         = 1e-7; // from T. Baumann Oct 2006
+        dEbeam          = 0.01;
+        resTime         = 0.3;
+        nNeutr          = 0;
+        nProt           = 0;
+        bSpotDx         = 0.004; // sigma from D. Denby Oct 11,2006
+        bSpotDy         = 0.008; // sigma from D. Denby Oct 11,2006
+        bSpotDtx        = 0.011; // sigma from D. Denby Oct 11,2006
+        bSpotDty        = 0.005; // sigma from D. Denby Oct 11,2006
+        crdc1MaskLeft   =  0.15 - 0.064;
+        crdc1MaskRight  = -0.15;
+        crdc2dist       = 1.00;
+        monaDist        = 8.20;
+	scaleStrag           = 0;
+	scaleGlaub           = 0;      
+      }  else if ( exp == "03048a") {  // 12Be to 10Be
+        INFO("Using default values for experiment 03048a (12Be g.s. to 10Be)");
+        eBeam           = 89.5;
+        beamA           = 12;
+        beamZ           = 4;
+        dTarget         = 188.0;
+        dEbeam          = 0.01;
+        //resTime         = .1;
+        //resTargetX      = 1.;
+        //resCRDC1XY      = 1.;
+        //resCRDC1ThetaXY = 1.;
+        //resMonaX        = 1.;
+        //resMonaBar      = 1; 
+        nNeutr          = 1;
+        nProt           = 0;
+        bSpotDx         = 0.010; // sigma
+        bSpotDy         = 0.012; 
+        bSpotDtx        = 0.01;  
+        bSpotDty        = 0.01;
+	//	bSpotCtx        = 0.0;                          ////////
+	//	bSpotCx         = 0.0;                          ////////
+	//       bSpotCty        = 0.0;                          ///////<
+	//	bSpotCy         = 0.0;                          ////////
+        crdc1MaskLeft   = 0.15 - 0.064; //after 2089, page 33 03048
+        crdc1MaskRight  = -0.15;
+        crdc2dist       = 1.88;
+        monaDist        = 8.258;
+      } else if ( exp == "03048b") {  // 11Be to 10Be
+        INFO("Using default values for experiment 03048b (11Be Coul to 10Be)");
+        eBeam           = 89.0;
+        beamA           = 11;
+        beamZ           = 4;
+        dTarget         = 258.0; //Gold
+        dEbeam          = 0.01;
+        resTime         = .1;
+        //resTargetX      = 1.;
+        //resCRDC1XY      = 1.;
+        //resCRDC1ThetaXY = 1.;
+        //resMonaX        = 0.04;
+        //resMonaBar      = 1; 
+	scaleStrag      = 0;
+	scaleGlaub      = 0;
+        nNeutr          = 0;
+        nProt           = 0;
+        bSpotDx         = 0.006; // sigma (m)
+        bSpotDy         = 0.045; 
+        bSpotDtx        = 0.000002;  // (rad)
+        bSpotDty        = 0.002;
+        crdc1MaskLeft   = 0.15 - 0.135; //page 33 03048
+	// bSpotCtx        = 0.0;                          ///////
+	// bSpotCx         = 0.0;                          ///////
+        // bSpotCty        = 0.0;                          ///////
+	// bSpotCy         = 0.0;                          ///////
+        crdc1MaskRight  = -0.15;
+        crdc2dist       = 1.88;
+        monaDist        = 8.258;
+      } else if ( exp == "03048c") {  // 12Be to 11Be mimic 11Be singles
+        INFO("Using default values for experiment 03048c (mimic 11Be singles)");
+        eBeam           = 89.0;
+        beamA           = 12;
+        beamZ           = 4;
+        dTarget         = 258.0; //Gold
+        dEbeam          = 0.01;
+        resTime         = .1;
+        //resTargetX      = 1.;
+        //resCRDC1XY      = 1.;
+        //resCRDC1ThetaXY = 1.;
+        //resMonaX        = 0.04;
+        //resMonaBar      = 1; 
+	scaleStrag      = 0;
+	scaleGlaub      = 0;
+        nNeutr          = 0;
+        nProt           = 0;
+        bSpotDx         = 0.003; // sigma (m)
+        bSpotDy         = 0.05; 
+        bSpotDtx        = 0.000002;  // (rad)
+        bSpotDty        = 0.003;
+        crdc1MaskLeft   = 0.15 - 0.12; //page 33 03048
+	// bSpotCtx        = 0.0;                          ////////
+	bSpotCx         = 0.003;                          ////////
+        // bSpotCty        = 0.0;                          ////////
+	// bSpotCy         = 0.0;                          ////////
+        crdc1MaskRight  = -0.15;
+        crdc2dist       = 1.88;
+        monaDist        = 8.258;
+      }  else if ( exp == "05039_O25") {  // Hoffman 25O
+        INFO("Using default values for experiment 05039 (Hoffman 25O) - zwk update"); 
+	//updated zwk
+        //eBeam           = 83.8; //84.58 from brho, but using Calem Thesis find 83.18;
+        eBeam           = 84.58; //84.58 from brho, but using Calem Thesis find 83.18;
+        beamA           = 26;
+        beamZ           = 9;
+        dTarget         = 500.;
+        //dTarget         = 475.12;
+        //dEbeam          = 0.0;
+        //dEbeam          = 0.025;
+        dEbeam          = 0.02; //changed zwk, calculated with Thomas b.
+
+        resTime         = 0.3;
+        resTargetX      = 0.0007;
+        resCRDC1X      = 0.0013;
+        resCRDC1ThetaX = 0.0013;
+	resCRDC1Y      = 0.0013;
+        resCRDC1ThetaY = 0.0013;
+
+        //resTime         = 0.0;
+        //resTargetX      = 0.000;
+        //resCRDC1X      = 0.00;
+        //resCRDC1ThetaX = 0.00;
+	//resCRDC1Y      = 0.00;
+        //resCRDC1ThetaY = 0.00;
+
+
+        //resMonaX1        = 0.04;
+	//resMonaX2       = 0.10;
+	//resMonaP        = 0.66;
+        //resMonaBar      = 1; 
+        nNeutr          = 0;
+        nProt           = 1;
+
+        bSpotDx         = 0.005; // sigma
+        bSpotDy         = 0.004; 
+        bSpotDtx        = 0.009;  
+        bSpotDty        = 0.0035;
+
+        //bSpotDx         = 0.00; // sigma
+        //bSpotDy         = 0.00; 
+        //bSpotDtx        = 0.00;  
+        //bSpotDty        = 0.00;
+
+	//bSpotCtx        = 0.00;                         ////
+	//bSpotCx         = 0.00;                          ////
+        //bSpotCty        = -0.00;                        ////
+	//bSpotCy         = -0.00;                        ////
+
+	bSpotCtx        = 0.008;                         ////
+	bSpotCx         = 0.00;                          ////
+        bSpotCty        = -0.001;                        ////
+	bSpotCy         = -0.001;                        ////
+
+        crdc1MaskLeft   =  0.15;
+        crdc1MaskRight  = -0.15;
+        crdc2dist       = 1.88;
+        monaDist        = 8.20;
+      }  else if ( exp == "05039a") {  // Hoffman 24O
+        INFO("Using default values for experiment 05039 (Hoffman 25O)");
+        eBeam           = 84.5;
+        beamA           = 26;
+        beamZ           = 9;
+        dTarget         = 500.0;
+        dEbeam          = 0.02;
+        resTime         = .3;
+	resTargetX      = 0.0007;
+        resCRDC1X       = 0.0013;
+        resCRDC1ThetaX  = 0.0013;
+	resCRDC1Y       = 0.0013;
+        resCRDC1ThetaY  = 0.0013;
+	// resMonaX1        = 0.04;
+	//resMonaX2       = 0.10;
+	//resMonaP        = 0.66;
+	nNeutr          = 1;
+        nProt           = 1;
+        bSpotDx         = 0.004; // sigma
+        bSpotDy         = 0.0025; 
+        bSpotDtx        = 0.008;  
+        bSpotDty        = 0.002;
+	bSpotCtx        = 0.008;                          ////////
+	bSpotCx         = 0.00;                          ////////
+        bSpotCty        = -0.001;                          ////////
+	bSpotCy         = -0.001;                        ////////
+        crdc1MaskLeft   =  0.15;
+        crdc1MaskRight  = -0.15;
+        crdc2dist       = 1.88;
+        monaDist        = 8.200;
+      }  else if ( exp == "05039b") {  // Hoffman 23O
+        INFO("Using default values for experiment 05039 (Hoffman 25O)");
+        eBeam           = 86.0;
+        beamA           = 26;
+        beamZ           = 9;
+        dTarget         = 470.0;
+        dEbeam          = 0.01;
+        resTime         = .3;
+        //resTargetX      = 1.;
+        //resCRDC1XY      = 1.;
+        //resCRDC1ThetaXY = 1.;
+        //resMonaX        = 1.;
+        //resMonaBar      = 1; 
+	//resMonaX1        = 0.04;
+	//resMonaX2       = 0.10;
+	//resMonaP        = 0.66;
+        nNeutr          = 2;
+        nProt           = 1;
+	bSpotDx         = 0.009; // sigma
+        bSpotDy         = 0.008; 
+        bSpotDtx        = 0.019;  
+        bSpotDty        = 0.006;
+	bSpotCtx        = -0.008;                          ////////
+	bSpotCx         = 0.00175;                          ////////
+        bSpotCty        = 0.002;                          ////////
+	bSpotCy         = 0.0;
+        crdc1MaskLeft   =  0.15;
+        crdc1MaskRight  = -0.15;
+        crdc2dist       = 1.88;
+        monaDist        = 8.200;
+      }    else if ( exp == "05039c") {  // Hoffman 25O
+        INFO("Using default values for experiment 05039 (Hoffman 25O)");
+        eBeam           = 84.0;
+        beamA           = 27;
+        beamZ           = 9;
+        dTarget         = 0.0;
+        dEbeam          = 0.025;
+        resTime         = 0.3;
+        resTargetX      = 0.0007;
+        resCRDC1X      = 0.0013;
+        resCRDC1ThetaX = 0.0013;
+	resCRDC1Y      = 0.0013;
+        resCRDC1ThetaY = 0.0013; 
+        nNeutr          = 0;
+        nProt           = 0;
+        bSpotDx         = 0.005; // sigma
+        bSpotDy         = 0.004; 
+        bSpotDtx        = 0.009;  
+        bSpotDty        = 0.0035;
+	bSpotCtx        = 0.008;                          ////////
+	bSpotCx         = 0.00;                          ////////
+        bSpotCty        = -0.001;                          ////////
+	bSpotCy         = -0.001;                          ////////
+        crdc1MaskLeft   =  0.15;
+        crdc1MaskRight  = -0.15;
+        crdc2dist       = 1.88;
+        monaDist        = 8.20;
+      } else if ( exp == "05124_Li9" ){ // FRAG II 
+        INFO("Using default values for 05124-z3n6 (FRAG II)");
+        eBeam           = 60.0;
+        beamA           = 48;
+        beamZ           = 20;
+        dTarget         = 94.0; // from
+        dEbeam          = 0.005;
+        resTime         = .3;
+        //resTargetX      = 1.;
+        //resCRDC1XY      = 1.;
+        //resCRDC1ThetaXY = 1.;
+        //resMonaX        = 1.;
+        //resMonaBar      = 1; 
+        nNeutr          = 21;
+        nProt           = 17;
+        bSpotDx         = 0.004; // 
+        bSpotDy         = 0.005; // 
+        bSpotDtx        = 0.008; //
+        bSpotDty        = 0.005; //
+	// bSpotCtx        = 0.0;                          //////
+	// bSpotCx         = 0.0;                          //////
+        // bSpotCty        = 0.0;                          //////
+	// bSpotCy         = 0.0;                          //////
+        crdc1MaskLeft   =  0.15;
+        crdc1MaskRight  = -0.15;
+        crdc2dist       = 1.823;
+        monaDist        = 15.385;
+      }  else if ( exp == "05124_O18" ){ // FRAG II 
+        INFO("Using default values for 05124-z8n10 (FRAG II)");
+        eBeam           = 60.0;
+        beamA           = 48;
+        beamZ           = 20;
+        dTarget         = 94.0; // from
+        dEbeam          = 0.005;
+        resTime         = .3;
+        //resTargetX      = 1.;
+        //resCRDC1XY      = 1.;
+        //resCRDC1ThetaXY = 1.;
+        //resMonaX        = 1.;
+        //resMonaBar      = 1; 
+        nNeutr          = 17;
+        nProt           = 12;
+        bSpotDx         = 0.004; // 
+        bSpotDy         = 0.005; // 
+        bSpotDtx        = 0.008; //
+        bSpotDty        = 0.005; //
+	// bSpotCtx        = 0.0;                          ///////
+	// bSpotCx         = 0.0;                          ///////
+        // bSpotCty        = 0.0;                          ///////
+	// bSpotCy         = 0.0;                          ///////
+        crdc1MaskLeft   =  0.15;
+        crdc1MaskRight  = -0.15;
+        crdc2dist       = 1.823;
+        monaDist        = 15.385;
+      }  else if ( exp == "05124_O19" ){ // FRAG II 
+        INFO("Using default values for 05124-z8n11 (FRAG II)");
+        eBeam           = 60.0;
+        beamA           = 48;
+        beamZ           = 20;
+        dTarget         = 94.0; // from
+        dEbeam          = 0.005;
+        resTime         = .3;
+        //resTargetX      = 1.;
+        //resCRDC1XY      = 1.;
+        //resCRDC1ThetaXY = 1.;
+        //resMonaX        = 1.;
+        //resMonaBar      = 1; 
+        nNeutr          = 16;
+        nProt           = 12;
+        bSpotDx         = 0.004; // 
+        bSpotDy         = 0.005; // 
+        bSpotDtx        = 0.008; //
+        bSpotDty        = 0.005; //
+	// bSpotCtx        = 0.0;                          ///////
+	// bSpotCx         = 0.0;                          ///////
+        // bSpotCty        = 0.0;                          ///////
+	// bSpotCy         = 0.0;                          ///////
+        crdc1MaskLeft   =  0.15;
+        crdc1MaskRight  = -0.15;
+        crdc2dist       = 1.823;
+        monaDist        = 15.385;
+      }  else if ( exp == "05124_O20" ){ // FRAG II 
+        INFO("Using default values for 05124-z8n12 (FRAG II)");
+        eBeam           = 60.0;
+        beamA           = 48;
+        beamZ           = 20;
+        dTarget         = 94.0; // from
+        dEbeam          = 0.005;
+        resTime         = .3;
+        //resTargetX      = 1.;
+        //resCRDC1XY      = 1.;
+        //resCRDC1ThetaXY = 1.;
+        //resMonaX        = 1.;
+        //resMonaBar      = 1; 
+        nNeutr          = 15;
+        nProt           = 12;
+        bSpotDx         = 0.004; //.004 
+        bSpotDy         = 0.005; // .005
+        bSpotDtx        = 0.008; //.008
+        bSpotDty        = 0.005; //.005
+	// bSpotCtx        = 0.0;                          ///////
+	// bSpotCx         = 0.0;                          ///////
+        // bSpotCty        = 0.0;                          ///////
+	// bSpotCy         = 0.0;                          ///////
+        crdc1MaskLeft   =  0.15;
+        crdc1MaskRight  = -0.15;
+        crdc2dist       = 1.823;
+        monaDist        = 15.385;
+      }  else if ( exp == "05124_O21" ){ // FRAG II 
+        INFO("Using default values for 05124-z8n13 (FRAG II)");
+        eBeam           = 60.0;
+        beamA           = 48;
+        beamZ           = 20;
+        dTarget         = 94.0; // from
+        dEbeam          = 0.005;
+        resTime         = .3;
+        //resTargetX      = 1.;
+        //resCRDC1XY      = 1.;
+        //resCRDC1ThetaXY = 1.;
+        //resMonaX        = 1.;
+        //resMonaBar      = 1; 
+        nNeutr          = 14;
+        nProt           = 12;
+        bSpotDx         = 0.004; // 
+        bSpotDy         = 0.005; // 
+        bSpotDtx        = 0.008; //
+        bSpotDty        = 0.005; //
+	// bSpotCtx        = 0.0;                          ///////
+	// bSpotCx         = 0.0;                          ///////
+        // bSpotCty        = 0.0;                          ///////
+	// bSpotCy         = 0.0;                          ///////
+        crdc1MaskLeft   =  0.15;
+        crdc1MaskRight  = -0.15;
+        crdc2dist       = 1.823;
+        monaDist        = 15.385;
+      }  else if ( exp == "05124_O22" ){ // FRAG II 
+        INFO("Using default values for 05124-z8n14 (FRAG II)");
+        eBeam           = 60.0;
+        beamA           = 48;
+        beamZ           = 20;
+        dTarget         = 94.0; // from
+        dEbeam          = 0.005;
+        resTime         = .3;
+        //resTargetX      = 1.;
+        //resCRDC1XY      = 1.;
+        //resCRDC1ThetaXY = 1.;
+        //resMonaX        = 1.;
+        //resMonaBar      = 1; 
+        nNeutr          = 13;
+        nProt           = 12;
+        bSpotDx         = 0.004; // 
+        bSpotDy         = 0.005; // 
+        bSpotDtx        = 0.008; //
+        bSpotDty        = 0.005; //
+	// bSpotCtx        = 0.0;                          //////
+	// bSpotCx         = 0.0;                          //////
+        // bSpotCty        = 0.0;                          //////
+	// bSpotCy         = 0.0;                          //////
+        crdc1MaskLeft   =  0.15;
+        crdc1MaskRight  = -0.15;
+        crdc2dist       = 1.823;
+        monaDist        = 15.385;
+      }  else if ( exp == "05124a" ){ // FRAG II 
+        INFO("Using default values for 05124-z8n12 (FRAG II)");
+        eBeam           = 60.0;
+        beamA           = 48;
+        beamZ           = 20;
+        dTarget         = 94.0; // from
+        dEbeam          = 0.005;
+        resTime         = .3;
+        //resTargetX      = 1.;
+        //resCRDC1XY      = 1.;
+        //resCRDC1ThetaXY = 1.;
+        //resMonaX        = 1.;
+        //resMonaBar      = 1; 
+        nNeutr          = 15;
+        nProt           = 12;
+        bSpotDx         = 0.004; // 
+        bSpotDy         = 0.005; // 
+        bSpotDtx        = 0.008; //
+        bSpotDty        = 0.005; //
+	// bSpotCtx        = 0.0;                          //////
+	// bSpotCx         = 0.0;                          //////
+        // bSpotCty        = 0.0;                          //////
+	// bSpotCy         = 0.0;                          //////
+        crdc1MaskLeft   =  0.15;
+        crdc1MaskRight  = -0.15;
+        crdc2dist       = 1.823;
+        monaDist        = 15.385;
+      } else if ( exp == "05124b" ){ // FRAG II 
+        INFO("Using default values for 05124-z5n8 (FRAG II)");
+        eBeam           = 60.0;
+        beamA           = 48;
+        beamZ           = 20;
+        dTarget         = 94.0; // from
+        dEbeam          = 0.005;
+        resTime         = .3;
+        //resTargetX      = 1.;
+        //resCRDC1XY      = 1.;
+        //resCRDC1ThetaXY = 1.;
+        //resMonaX        = 1.;
+        //resMonaBar      = 1; 
+        nNeutr          = 19;
+        nProt           = 15;
+        bSpotDx         = 0.004; // 
+        bSpotDy         = 0.005; // 
+        bSpotDtx        = 0.008; //set back to .008!!!
+        bSpotDty        = 0.005; //
+	// bSpotCtx        = 0.0;                          //////
+	// bSpotCx         = 0.0;                          //////
+        // bSpotCty        = 0.0;                          //////
+	// bSpotCy         = 0.0;                          //////
+        crdc1MaskLeft   =  0.15;
+        crdc1MaskRight  = -0.15;
+        crdc2dist       = 1.823;
+        monaDist        = 15.385;
+      } else if ( exp == "05124c" ){ // FRAG II 
+        INFO("Using default values for 05124-z10n15 (FRAG II)");
+        eBeam           = 60.0;
+        beamA           = 48;
+        beamZ           = 20;
+        dTarget         = 94.0; // from
+        dEbeam          = 0.005;
+        resTime         = .3;
+        //resTargetX      = 1.;
+        //resCRDC1XY      = 1.;
+        //resCRDC1ThetaXY = 1.;
+        //resMonaX        = 1.;
+        //resMonaBar      = 1; 
+        nNeutr          = 12;
+        nProt           = 10;
+        bSpotDx         = 0.004; // 
+        bSpotDy         = 0.005; // 
+        bSpotDtx        = 0.008; //
+        bSpotDty        = 0.005; //
+	// bSpotCtx        = 0.0;                          ////////
+	// bSpotCx         = 0.0;                          ////////
+        // bSpotCty        = 0.0;                          ////////
+	// bSpotCy         = 0.0;                          ////////
+        crdc1MaskLeft   =  0.15;
+        crdc1MaskRight  = -0.15 + 0.14;
+        crdc2dist       = 1.823;
+        monaDist        = 15.385;
+      } else if ( exp == "05124d" ){ // FRAG II 
+        INFO("Using default values for 05124-z6n10 (FRAG II)");
+        eBeam           = 60.0;
+        beamA           = 48;
+        beamZ           = 20;
+        dTarget         = 94.0; // from
+        dEbeam          = 0.005;
+        resTime         = .3;
+        //resTargetX      = 1.;
+        //resCRDC1XY      = 1.;
+        //resCRDC1ThetaXY = 1.;
+        //resMonaX        = 1.;
+        //resMonaBar      = 1; 
+        nNeutr          = 17;
+        nProt           = 14;
+        bSpotDx         = 0.004; // 
+        bSpotDy         = 0.005; // 
+        bSpotDtx        = 0.008; //
+        bSpotDty        = 0.005; //
+	// bSpotCtx        = 0.0;                          ///////
+	// bSpotCx         = 0.0;                          ///////
+        // bSpotCty        = 0.0;                          ///////
+	// bSpotCy         = 0.0;                          ///////
+        crdc1MaskLeft   =  0.15;
+        crdc1MaskRight  = -0.15; // + 0.14;
+        crdc2dist       = 1.823;
+        monaDist        = 15.385;
+      } else if ( exp == "05124e" ){ // FRAG II 
+        INFO("Using default values for 05124-z8n11 (FRAG II)");
+        eBeam           = 60.0;
+        beamA           = 48;
+        beamZ           = 20;
+        dTarget         = 94.0; // from
+        dEbeam          = 0.005;
+        resTime         = .3;
+        //resTargetX      = 1.;
+        //resCRDC1XY      = 1.;
+        //resCRDC1ThetaXY = 1.;
+        //resMonaX        = 1.;
+        //resMonaBar      = 1; 
+        nNeutr          = 16;
+        nProt           = 12;
+        bSpotDx         = 0.004; // 
+        bSpotDy         = 0.005; // 
+        bSpotDtx        = 0.008; //
+        bSpotDty        = 0.005; //
+	// bSpotCtx        = 0.0;                          ////////
+	// bSpotCx         = 0.0;                          ////////
+        // bSpotCty        = 0.0;                          ////////
+	// bSpotCy         = 0.0;                          ////////
+        crdc1MaskLeft   =  0.15;
+        crdc1MaskRight  = -0.15 + 0.14;
+        crdc2dist       = 1.823;
+        monaDist        = 15.385;
+      } else if ( exp == "05124g" ){ // FRAG II 
+        INFO("Using default values for 05124-Beam (FRAG II)");
+        eBeam           = 60.0;
+        beamA           = 48;
+        beamZ           = 20;
+        dTarget         = 0.0; // from
+        dEbeam          = 0.005;
+        resTime         = .3;
+        //resTargetX      = 1.;
+        //resCRDC1XY      = 1.;
+        //resCRDC1ThetaXY = 1.;
+        //resMonaX        = 1.;
+        //resMonaBar      = 1; 
+        nNeutr          = 0;
+        nProt           = 0;
+        bSpotDx         = 0.004; // 
+        bSpotDy         = 0.005; // 
+        bSpotDtx        = 0.008; //
+        bSpotDty        = 0.005; //
+	// bSpotCtx        = 0.0;                          ///////
+	// bSpotCx         = 0.0;                          ///////
+        // bSpotCty        = 0.0;                          ///////
+	// bSpotCy         = 0.0;                          ///////
+        crdc1MaskLeft   =  0.15;
+        crdc1MaskRight  = -0.15 + 0.14;
+        crdc2dist       = 1.823;
+        monaDist        = 15.385;
+      }  else if ( exp == "05034a" ){ // 11Li 
+        INFO("Using default values for 05034-14B (11Li) 14B->12Li->11Li+n - zwk update");
+        eBeam           = 53.4;
+        beamA           = 14;
+        beamZ           = 5;
+        dTarget         = 470; // 
+        dEbeam          = 0.0087;
+        resTime         = .3;
+        //resTargetX      = 1.;
+        //resCRDC1XY      = 1.;
+        //resCRDC1ThetaXY = 1.;
+        //resMonaX        = 1.;
+        //resMonaBar      = 1; 
+        nNeutr          = 0;
+        nProt           = 2;
+        bSpotDx         = 0.004; // sigma from C. Hall Jul 17, 2007 
+        bSpotDy         = 0.016; // sigma from C. Hall Jul 17, 2007
+        bSpotDtx        = 0.023; // sigma from C. Hall Jul 17, 2007
+        bSpotDty        = 0.012; // sigma from C. Hall Jul 17, 2007
+	// bSpotCtx        = 0.0;                          ///////
+	// bSpotCx         = 0.0;                          ///////
+        // bSpotCty        = 0.0;                          ///////
+	// bSpotCy         = 0.0;                          ///////
+        crdc1MaskLeft   =  0.15;
+        crdc1MaskRight  = -0.15;
+        crdc2dist       = 1.816;
+        monaDist        = 8.44;
+      } else if ( exp == "05034_Be" ){ // 11Li 
+        INFO("Using default values for 05034-14Be Beam (11Li+2n)");
+        eBeam           = 53.6;
+        beamA           = 14;
+        beamZ           = 4;
+        dTarget         = 470; // 
+        dEbeam          = 0.024;
+        resTime         = .3;
+        //resTargetX      = 1.;
+        //resCRDC1XY      = 1.;
+        //resCRDC1ThetaXY = 1.;
+        //resMonaX        = 1.;
+        //resMonaBar      = 1; 
+        nNeutr          = 0;
+        nProt           = 1;
+        bSpotDx         = 0.005; 
+        bSpotDy         = 0.005; 
+        bSpotDtx        = 0.023; 
+        bSpotDty        = 0.012; 
+	// bSpotCtx        = 0.0;
+	// bSpotCx         = 0.0;
+        // bSpotCty        = 0.0;
+	// bSpotCy         = 0.0;
+        crdc1MaskLeft   =  0.15;
+        crdc1MaskRight  = -0.15;	
+	crdc2MaskLeft  =  0.15;   //crdc2 mask added zwk 8/16/11                             
+	crdc2MaskRight = -0.15;                              
+	crdc2MaskTop  =  0.15;                              
+	crdc2MaskBot = -0.15;   
+        crdc2dist       = 1.816;
+        monaDist        = 8.44;
+      }  
+      else if ( exp == "06025_B16" ){ // C17 beam, create Be15 
+        INFO("Using default values for 06025- B15 decay");
+	//exp = x;
+        eBeam           = 54.0; // instead of  54.6;
+        beamA           = 17;
+        beamZ           = 6;
+        dTarget         = 470; // 
+        dEbeam          = 0.006;
+        resTime         = .3;
+        //resTargetX      = 1.;
+        //resCRDC1XY      = 1.;
+        //resCRDC1ThetaXY = 1.;
+        //resMonaX        = 1.;
+        //resMonaBar      = 1; 
+        nNeutr          = 0;
+        nProt           = 1;
+        bSpotCx         = 0.004; // from experimental im parameters 
+        bSpotCy         = 0.0;  
+        bSpotCtx        = 0.00; 
+        bSpotCty        = -0.001; 
+	bSpotDtx        = 0.006;
+	bSpotDx         = 0.007;
+	bSpotDty        = 0.004;
+	bSpotDy         = 0.002;
+        crdc1MaskLeft   =  0.09;
+        crdc1MaskRight  = -0.09;
+        crdc2dist       = 1.829;
+        monaDist        = 7.904;
+      } else if ( exp == "06025_Be16" ){ // 16Be->14Be+2n 
+        INFO("Using default values for 06025-17B Beam (16Be->14Be+2n)");
+        eBeam           = 53.1;// from LISE++ file of the experiment
+        beamA           = 17;
+        beamZ           = 5;
+        dTarget         = 470; // 
+        dEbeam          = 0.02;// check if this is correct!!!!!!!!!!!!!!!!!!!
+        resTime         = .3;
+        //resTargetX      = 1.;
+        //resCRDC1XY      = 1.;
+        //resCRDC1ThetaXY = 1.;
+        //resMonaX        = 1.;
+        //resMonaBar      = 1; 
+        nNeutr          = 0;
+        nProt           = 1;
+        bSpotDx         = 0.006; 
+        bSpotDy         = 0.004; 
+        bSpotDtx        = 0.007; 
+        bSpotDty        = 0.002; 
+	// bSpotCtx        = 0.0;
+	// bSpotCx         = 0.0;
+        // bSpotCty        = 0.0;
+	// bSpotCy         = 0.0;
+        crdc1MaskLeft   =  0.09;
+        crdc1MaskRight  = -0.09;
+        crdc2dist       = 1.829;
+        monaDist        = 7.904;
+	crdc2MaskLeft  =  0.15;   //crdc2 mask added zwk 8/16/11                             
+	crdc2MaskRight = -0.121;                              
+	crdc2MaskTop  =  0.12;                              
+	crdc2MaskBot = -0.0;      
+
+      } 
+      else if ( exp == "99999") {  // 15Be to 14Be, propulated by a (d,p) reaction
+        INFO("Using default values for experiment 03048a (12Be g.s. to 10Be)");
+        eBeam           = 56;
+        beamA           = 15;
+        beamZ           = 4;
+        dTarget         = 435.0;
+        dEbeam          = 0.01;
+        nNeutr          = 0;
+        nProt           = 0;
+        bSpotDx         = 0.00399; 
+        bSpotDy         = 0.00218; 
+        bSpotDtx        = 0.01062; 
+        bSpotDty        = 0.00875;     
+        crdc1MaskLeft   = 0.15;
+	crdc1MaskRight  = -0.15;
+        crdc2dist       = 1.88;
+        monaDist        = 8.2;
+      }  else if ( exp == "99999a") {  // 
+        INFO("Using default values for experiment 03048a (12Be g.s. to 10Be)");
+        eBeam           = 75;
+        beamA           = 14;
+        beamZ           = 4;
+        dTarget         = 235.0;
+	/*
+	  scaleStrag      = 0;
+	  scaleGlaub      = 0;
+	  resMonaBar      = 0; 
+	  resTime         = 0.0;
+	  resTargetX      = 0.0; 
+	  resCRDC1X	= 0.0; 
+	  resCRDC1Y	= 0.0;
+	  resCRDC1ThetaX	= 0.0;
+	  resCRDC1ThetaY	= 0.0;
+	  resMonaX1	= 0.0;
+	  resMonaX2	= 0.0;
+	  resMonaP	= 0.0;
+	  bSpotCx         = 0.0; 
+	  bSpotCtx        = 0.0; 
+	  bSpotCy         = 0.0; 
+	  bSpotCty        = 0.0; 
+	  bSpotDx         = 0.0; 
+	  bSpotDtx        = 0.0; 
+	  bSpotDy         = 0.0; 
+	  bSpotDty        = 0.0; 
+	  dEbeam          = 0.0;
+	*/
+        nNeutr          = 0;
+        nProt           = 1;    
+        crdc1MaskLeft   = 0.15;
+	crdc1MaskRight  = -0.15;
+        crdc2dist       = 1.88;
+        monaDist        = 8.2;
+      }else if ( exp == "08026_O26" ){ // 27F -> O26 -> O24+2n 
+        INFO("Using default values for 08026 Beam (O26->O24+2n)");
+        eBeam           = 82.;
+        beamA           = 27;
+        beamZ           = 9;
+        dTarget         = 705; // 
+        dEbeam          = 0.024;//
+        resTime         = .3;
+        //resTargetX      = 1.;
+        //resCRDC1XY      = 1.;
+        //resCRDC1ThetaXY = 1.;
+        //resMonaX        = 1.;
+        //resMonaBar      = 1; 
+        nNeutr          = 0;
+        nProt           = 1;
+        bSpotDx         = 0.005; 
+        bSpotDy         = 0.005; 
+        bSpotDtx        = 0.007; 
+        bSpotDty        = 0.002; 
+	//bSpotCtx        = 0.0;
+	// bSpotCx         = 0.0;
+        // bSpotCty        = 0.0;
+	// bSpotCy         = 0.0;
+        crdc1MaskLeft   =  0.09;
+        crdc1MaskRight  = -0.09;
+        crdc2dist       = 1.829;
+        monaDist        = 6.07;
+	crdc2MaskLeft  =  0.15;                           
+	crdc2MaskRight = -0.130;                              
+	crdc2MaskTop  =  0.15;                              
+	crdc2MaskBot = -0.15;      
+
+      } else if ( exp == "05039naNe26") {  // Hoffman 25O
+        INFO("Using default values for experiment 05039 incoming Na beam (Hoffman 25O)");
+	INFO(" 28Ne --> 26Ne + 2n " );
+	eBeam           = 100.5;
+	beamA           = 29;
+	beamZ           = 11;
+	//dTarget         = 473.1;
+	dTarget         = 500.;
+	dEbeam          = 0.025;
+	resTime         = 0.3;
+	resTargetX      = 0.0007;
+	resCRDC1X      = 0.0013;
+	resCRDC1ThetaX = 0.0013;
+	resCRDC1Y      = 0.0013;
+	resCRDC1ThetaY = 0.0013;
+	nNeutr          = 0;
+	nProt           = 1;
+	bSpotDx         = 0.005; // sigma
+	bSpotDy         = 0.004;
+	bSpotDtx        = 0.009;
+	bSpotDty        = 0.0035;
+	bSpotCtx        = 0.008;                          ////////
+	bSpotCx         = 0.00;                          ////////
+	bSpotCty        = -0.001;                          ////////
+	bSpotCy         = -0.001;                          ////////
+	crdc1MaskLeft   =  0.15;                 
+	crdc1MaskRight  = -0.15;
+	crdc2dist       = 1.88;
+	monaDist        = 8.20;
+      }
+      else if(exp == "09067_He10"){
+	INFO("Exper Jesse 14Be(-2p2n) --> 10He --> 8He + 2n " );
+	eBeam           = 59.34;
+        beamA           = 14;
+        beamZ           = 4;
+        dTarget         = 435.0;//435.0; 445
+        dEbeam          = 0.0215;
+        nNeutr          = 2;
+        nProt           = 2;
+	bSpotCx         = 0.0; 
+	bSpotCtx        = 0.0; 
+	bSpotCy         = 0.0; 
+	bSpotCty        = 0.0; 
+	bSpotDx         = 0.003; 
+	bSpotDy         = 0.0045; 
+        bSpotDtx        = 0.006; 
+        bSpotDty        = 0.00325;     
+        crdc1MaskLeft   = 0.15;
+	crdc1MaskRight  = -0.15;
+        crdc2dist       = 1.88;
+        monaDist        = 8.2;	
+      }
+      else if(exp == "09067_Be14_Inelastic"){
+	INFO("Exper Jesse 14Be+CD2 --> 14Be*(2+) --> 12Be + 2n " );
+	eBeam           = 59.34;
+        beamA           = 14;
+        beamZ           = 4;
+        dTarget         = 435.0;//435.0; 445
+        //dEbeam          = 0.0215;
+        dEbeam          = 0.04;
+        nNeutr          = 0;
+        nProt           = 0;
+	bSpotCx         = 0.0; 
+	bSpotCtx        = 0.0; 
+	bSpotCy         = 0.0; 
+	bSpotCty        = 0.0; 
+	bSpotDx         = 0.003; 
+	bSpotDy         = 0.0045; 
+        bSpotDtx        = 0.006; 
+        bSpotDty        = 0.00325;     
+        crdc1MaskLeft   = 0.15;
+	crdc1MaskRight  = -0.15;
+        crdc2dist       = 1.88;
+        monaDist        = 8.2;	
+      }
+      else ERR("Unknown Experiment %s.",exp.c_str());
+    }
+    else if (sw == "-?" || sw == "--help" || sw == "-help") usage();
+    else ERR("Unknown option %s",sw.c_str());
+  }
+
+  if (argc < 2) {
+    WAR("No command line options given.  Printing usage information.\n");
+    usage();
+  }
+
+
+  TFile *f = new TFile(tupleFile.c_str(),"recreate");// assert(outFile);
+  TTree *pt = new TTree("pt","Parameter Tree");// assert(tOut);
+
+  pt->Branch("beamA",&beamA,"beamA/I");
+  pt->Branch("beamZ",&beamZ,"beamZ/I");
+  pt->Branch("nNeutr",&nNeutr,"nNeutr/I");
+  pt->Branch("nProt",&nProt,"nProt/I");
+  pt->Branch("exParInt_0",&exParInt[0],"exParInt_0/I");
+  pt->Branch("DecayOneFilled",&DecayOneFilled,"DecayOneFilleed/I");
+  pt->Branch("DecayTwoFilled",&DecayTwoFilled,"DecayTwoFilled/I");
+  pt->Branch("DecayTotalFilled",&DecayTotalFilled,"DecayTotalFilled/I");
+  pt->Branch("resMonaBar",&resMonaBar,"resMonaBar/I");
+
+  pt->Branch("exPar_0",&exPar[0],"exPar_0/D");
+  pt->Branch("exPar_1",&exPar[1],"exPar_1/D");
+  pt->Branch("exPar_2",&exPar[2],"exPar_2/D");
+  pt->Branch("exPar_3",&exPar[3],"exPar_3/D");
+  pt->Branch("exPar_4",&exPar[4],"exPar_4/D");
+  pt->Branch("exPar1_0",&exPar1[0],"exPar1_0/D");
+  pt->Branch("exPar1_1",&exPar1[1],"exPar1_1/D");
+  pt->Branch("exPar2_0",&exPar2[0],"exPar2_0/D");
+  pt->Branch("exPar2_1",&exPar2[1],"exPar2_1/D");
+  pt->Branch("reacQval",&reacQval,"reacQval/D");
+  pt->Branch("reacQvalSpread",&reacQvalSpread,"reacQvalSpread/D");
+  pt->Branch("reacASpread",&reacASpread,"reacASpread/D");
+  pt->Branch("reacALowLim",&reacALowLim,"reacALowLim/D");
+  pt->Branch("reacAUpLim",&reacAUpLim,"reacAUpLim/D");
+  pt->Branch("eBeam",&eBeam,"eBeam/D");
+  pt->Branch("dEbeam",&dEbeam,"dEbeam/D");
+  pt->Branch("dTarget",&dTarget,"dTarget/D");
+  pt->Branch("resTime",&resTime,"resTime/D");
+  pt->Branch("resTargetX",&resTargetX,"resTargetX/D");
+  pt->Branch("resCRDC1X",&resCRDC1X,"resCRDC1X/D");
+  pt->Branch("resCRDC1Y",&resCRDC1Y,"resCRDC1Y/D");
+  pt->Branch("resCRDC1ThetaX",&resCRDC1ThetaX,"resCRDC1ThetaX/D");
+  pt->Branch("resCRDC1ThetaY",&resCRDC1ThetaY,"resCRDC1ThetaY/D");
+  pt->Branch("resMonaX1",&resMonaX1,"resMonaX1/D");
+  pt->Branch("resMonaX2",&resMonaX2,"resMonaX2/D");
+  pt->Branch("resMonaP",&resMonaP,"resMonaP/D");
+  pt->Branch("scaleGlaub",&scaleGlaub,"scaleGlaub/D");
+  pt->Branch("scaleStrag",&scaleStrag,"scaleStrag/D");
+  pt->Branch("bSpotDx",&bSpotDx,"bSpotDx/D");
+  pt->Branch("bSpotDy",&bSpotDy,"bSpotDy/D");
+  pt->Branch("bSpotDtx",&bSpotDtx,"bSpotDtx/D");
+  pt->Branch("bSpotDty",&bSpotDty,"bSpotDty/D");
+  pt->Branch("bSpotCtx",&bSpotCtx,"bSpotCtx/D");
+  pt->Branch("bSpotCx",&bSpotCx,"bSpotCx/D");
+  pt->Branch("bSpotCty",&bSpotCty,"bSpotCty/D");
+  pt->Branch("bSpotCy",&bSpotCy,"bSpotCy/D");
+  pt->Branch("crdc2dist",&crdc2dist,"crdc2dist/D");
+  pt->Branch("monaDist",&monaDist,"monaDist/D");
+  pt->Branch("crdc1MaskLeft",&crdc1MaskLeft,"crdc1MaskLeft/D");
+  pt->Branch("crdc1MaskRight",&crdc1MaskRight,"crdc1MaskRight/D");
+  pt->Branch("distTypeMx",&distTypeMx,"distTypeMx/D");
+
+  //TObjString* testwtf = new TObjString("ItWorks!");
+  //pt->Branch("testwtf",&testwtf,"testwtf/C");
+  //pt->Branch("exType1",&exType1,"exType1/C");
+  //pt->Branch("exType2",&exType2,"exType2/C");
+  //pt->Branch("WhichEnergyIsReconstruct",&WhichEnergyIsReconstruct,"WhichEnergyIsReconstruct");
+  //pt->Branch("reacType",&reacType,"reacType/C");
+  //pt->Branch("aDistType",&aDistType,"aDistType/C");
+  //pt->Branch("debugSwitch",&debugSwitch,"debugSwitch/C");
+  //pt->Branch("exp",&exp,"exp/C");
+
+  //TObjString mapname = "mymap.map";
+  //mapname.Write("mapname"); // the argument will be what the string iscalled in the file
+
+  pt->Fill();
+  pt->Write();
+  f->Close();
+
+  printf("            Number of events:    %d events.\n",nevents);          //  1
+  printf("             Writing to file:    %s.\n",tupleFile.c_str());       //  2
+  printf("     Total Excitation energy:    %s %g %g\n",exType.c_str(), exPar[0], exPar[1]); //  3
+  printf("       1st Excitation energy:    %s %g %g\n",exType1.c_str(), exPar1[0], exPar1[1]); //  3
+  printf("       2nd Excitation energy:    %s %g %g\n",exType2.c_str(), exPar2[0], exPar2[1]); //  3
+  printf("                    beam A-Z:    %d-%-3d\n",beamA,beamZ);        //  4,5
+  printf("            target thickness:    %g mg/cm^2\n",dTarget);       //  6
+  printf("                 beam energy:    %g MeV/u\n",eBeam);           //  7
+  printf("          beam energy spread:    %g \n",dEbeam);               //  8
+  printf("         Angular strag scale:    %g \n",scaleStrag);           // 15
+  printf("          Glauber Kick scale:    %g \n",scaleGlaub);           // 16
+  printf("   Velocity & AsymMom scales:    %g, %g \n",velocityshift, asymMomentum);           // 16
+  printf("    protons, neutron removed:    %d,%d \n",nProt, nNeutr);        // 17, 18
+  printf("         beam spot x,y,tx,ty:    %g, %g, %g, %g\n",bSpotDx, bSpotDy,bSpotDtx,bSpotDty);
+  printf("\n");
+  printf("Resolutions are:\n"); 
+  printf("                        time:    %g ns \n",resTime);           //9 
+  printf("                    Target x:    %g m\n",resTargetX);          //10
+  printf("                     CRDC1 X:    %g m\n",resCRDC1X);          //11
+  printf("                     CRDC1 Y:    %g m\n",resCRDC1Y);          //11
+  printf("                CRDC1 ThetaX:    %g rad\n",resCRDC1ThetaX);   //12
+  printf("                CRDC1 ThetaY:    %g rad\n",resCRDC1ThetaY);   //12
+  printf("                     MoNA X1:    %g m\n",resMonaX1);            //13
+  printf("                     MoNA X2:    %g m\n",resMonaX2);            //13
+  printf("              MoNA X percent:    %g\n",resMonaP);            //13
+  printf("     MoNA bar (0/1 = no/yes):    %d \n",resMonaBar);             //14
+  printf("                  crdc2 Dist:    %g\n",crdc2dist);             //23
+  printf("                      MoNA z:    %g\n",monaDist);              //19
+  printf("          crdc1 left blocker:    %g\n",crdc1MaskLeft);         //21
+  printf("         crdc1 right blocker:    %g\n",crdc1MaskRight);        //22
+  printf("        Type of Mona X Dist.:    %g\n",distTypeMx);            //32
+  printf("CRDC2 Mask(right,left,top,bot):  %g, %g, %g, %g\n",crdc2MaskRight,crdc2MaskLeft,crdc2MaskTop,crdc2MaskBot);
+  printf("\n");
+
+  // system
+  StSystem sys;
+
+  // a particle
+  StParticle p;
+  // set A, Z and Q
+  p.setA(beamA);             // mass number A
+  p.setZ(beamZ);             // proton number Z
+  p.setQ(p.getZ());          // charge Q
+  p.setm(p.getA()*931.494028);    // mass m
+
+  // add one particle to the system
+  sys.addParticle(p);
+
+  // GSL random number generator
+  StGSLrng* r = new StGSLrng();
+
+  // RNGs for x, y, tx, ty and energy
+  StRNG* rx  = new StRNGGaussGSL(r, bSpotCx, bSpotDx /*.005*/);                   ///////<<<<<<<<<<<<<<<<<<<<<<
+    StRNG* ry  = new StRNGGaussGSL(r, bSpotCy, bSpotDy /*.012*/);                   ///////<<<<<<<<<<<<<<<<<<<<<<
+      StRNG* rtx = new StRNGGaussGSL(r, bSpotCtx, bSpotDtx /*.01*/);                  ///////<<<<<<<<<<<<<<<<<<<<<<
+	StRNG* rty = new StRNGGaussGSL(r, bSpotCty, bSpotDty /*.0015*/);                ///////<<<<<<<<<<<<<<<<<<<<<<
+
+	  //changed zwk, Thomas said that momeuntum accpetance is more of a step function than Gaussian
+	  //StRNG* re  = new StRNGGaussGSL(r, eBeam*p.getA(), eBeam*p.getA()*dEbeam);
+	  StRNG* re  = new StRNGUniformGSL(r, eBeam*p.getA()*(1.-dEbeam), eBeam*p.getA()*(1.+dEbeam) );
+
+	  StRNGUniform* rUniform = new StRNGUniformGSL(r);
+	  //added for 2body angular distribution manipulation
+  
+	  // elements needed for target
+	  StElement Au197;
+	  Au197.setZ(79);
+	  Au197.setm(197);   /// \todo need exact mass here
+
+	    StElement Be9;
+	    Be9.setZ(4);
+	    Be9.setm(9);   /// \todo need exact mass here
+
+	      StElement CD2;
+	      CD2.setZ(8);
+	      CD2.setm(16);   /// \todo need exact mass here
+
+
+		StMaterial* matTarget = new StMaterial();
+
+		if (exp == "03048b" || exp == "03048c") {
+		  INFO("using gold Target.\n");
+		  // target material set to Gold but still name matTarget
+		  matTarget->addElement(Au197);
+		  matTarget->setThickness(dTarget);
+		} else if (exp == "99999" || exp == "09067_He10" || exp == "09067_Be14_Inelastic") {
+		  INFO("using an effective Be9 Target instead of CD2.\n");
+		  // target material original Be
+		  matTarget->addElement(Be9);
+		  matTarget->setThickness(dTarget*1.115);
+		} else if (1) {
+		  INFO("using Be Target.\n");
+		  // target material original Be
+		  matTarget->addElement(Be9);
+		  matTarget->setThickness(dTarget);
+		}
+
+
+		// use lookup table for energy if there are more than 100 events
+		StRageny* rageny;
+		rageny = new StRageny(1);  // always use interpolator!!!
+		rageny->setRngUniform(new StRNGUniformGSL(r));
+		rageny->setRngGauss(new StRNGGaussGSL(r));
+
+		matTarget->setInteraction(rageny);
+		matTarget->setStragAngScale(scaleStrag);  
+
+
+		//--zwk--Momentum distribution--
+		StRNG* rMomDist(0);
+		bool kUseMomDist = false;
+		if(momType.Contains("para") || momType.Contains("perp") ){
+		  rMomDist = new StRNGCustomGSL(r, momFile);
+		  kUseMomDist = true;
+		  if(momType.Contains("perp")) cerr << "Currently NO support for perp mom. distributions!!" << endl;
+		}
+
+		// reaction (in Be target)
+		StRNG* rReac(0);
+		if (exType == "const")          rReac = new StRNGGaussGSL(r,exPar[0],0);
+		else if (exType == "therm")          rReac = new StRNGGammaGSL(r,1.5,exPar[0]);
+		else if (exType == "e1")             rReac = new StRNGCustomE1(r,exPar[0],exPar[1]);
+		else if (exType == "uniform")        rReac = new StRNGUniformGSL(r,exPar[0],exPar[1]);
+		else if (exType == "gauss")          rReac = new StRNGGaussGSL(r,exPar[0],exPar[1]);
+		else if (exType == "exp")            rReac = new StRNGExpGSL(r, 1. / exPar[0]);
+		else if (exType == "Etotal_11Li")    rReac = new StRNGEtotal_11LiGSL(r, exPar[0]);
+		else if (exType == "E_12Li")         rReac = new StRNGE_12LiGSL(r, exPar[0]);
+		else if (exType == "asymbw")         rReac = new StRNGAsymmetricBWGSL(r,exPar[0],exPar[1],exParInt[0],beamA - nProt - nNeutr - 1,exParInt[1]);
+		else if (exType == "swave")          rReac = new StRNGswave(r,exPar[0],exPar[1]); //added by JKS 11 July 2011 for swave lineshape
+		else if (exType == "cust")           rReac = new StRNGCustomGSL(r,cust_file);
+		else if (exType == "bw") {
+		  StRNGCauchyGSL* rReacCauchy = new StRNGCauchyGSL(r,exPar[0],exPar[1]);
+		  rReacCauchy -> setGamma(exPar[1]);                // set Gamma
+		  rReac = rReacCauchy;
+		} else if (exType == "TwoNeutron_seq") rReac = new StRNGTwoNeutron_seqGSL(r,exPar[0],exPar[1],exPar[2],exPar[3],exPar[4],exParInt[0],beamA,nNeutr,nProt); 
+		else if (exType == "Volya_2nSeq")      rReac = new StRNGVolya_2nseqGSL(r,exPar[0],exPar[1],exPar[2],exPar[3],exParInt[0], exPar[4],(beamA-nNeutr-nProt));  
+		else if (exType == "Volya_Dineutron")  rReac = new StRNGVolya_DineutronGSL(r,exPar[0],exPar[1],exPar[2],(beamA-nNeutr-nProt)); 
+
+		// reaction (in Be target)
+		StRNG* rReac1(0);
+		if (exType1 == "const")          rReac1 = new StRNGGaussGSL(r,exPar1[0],0);
+		else if (exType1 == "therm")          rReac1 = new StRNGGammaGSL(r,1.5,exPar1[0]);
+		else if (exType1 == "e1")             rReac1 = new StRNGCustomE1(r,exPar1[0],exPar1[1]);
+		else if (exType1 == "uniform")        rReac1 = new StRNGUniformGSL(r,exPar1[0],exPar1[1]);
+		else if (exType1 == "gauss")          rReac1 = new StRNGGaussGSL(r,exPar1[0],exPar1[1]);
+		else if (exType1 == "cos_twoneutron") rReac1 = new StRNGCos_twoneutronGSL(r,0,1);
+		else if (exType1 == "exp")            rReac1 = new StRNGExpGSL(r, 1. / exPar1[0]);
+		else if (exType1 == "Etotal_11Li")    rReac1 = new StRNGEtotal_11LiGSL(r, exPar[0]);
+		else if (exType1 == "E_12Li")         rReac1 = new StRNGE_12LiGSL(r, exPar[0]);
+		else if (exType1 == "asymbw")         rReac1 = new StRNGAsymmetricBWGSL(r,exPar1[0],exPar1[1],exPar1Int[0],beamA - nProt - nNeutr - 1,exPar1Int[1]);
+		else if (exType1 == "cust")           rReac1 = new StRNGCustomGSL(r,cust_file1);   
+		else if (exType1 == "swave")          rReac1 = new StRNGswave(r,exPar1[0],exPar1[1]); //added by JKS 11 July 2011 for swave lineshape  
+		else if (exType1 == "bw") {
+		  StRNGCauchyGSL* rReacCauchy = new StRNGCauchyGSL(r,exPar1[0],exPar1[1]);
+		  rReacCauchy -> setGamma(exPar1[1]);                // set Gamma
+		  rReac1 = rReacCauchy;
+		}
+		// reaction (in Be target)
+		StRNG* rReac2(0);
+		if (exType2 == "const")          rReac2 = new StRNGGaussGSL(r,exPar2[0],0);
+		else if (exType2 == "therm")          rReac2 = new StRNGGammaGSL(r,1.5,exPar2[0]);
+		else if (exType2 == "e1")             rReac2 = new StRNGCustomE1(r,exPar2[0],exPar2[1]);
+		else if (exType2 == "uniform")        rReac2 = new StRNGUniformGSL(r,exPar2[0],exPar2[1]);
+		else if (exType2 == "gauss")          rReac2 = new StRNGGaussGSL(r,exPar2[0],exPar2[1]);
+		else if (exType2 == "cos_twoneutron") rReac2 = new StRNGCos_twoneutronGSL(r,0,1);
+		else if (exType2 == "exp")            rReac2 = new StRNGExpGSL(r, 1. / exPar2[0]);
+		else if (exType2 == "Etotal_11Li")    rReac2 = new StRNGEtotal_11LiGSL(r, exPar[0]);
+		else if (exType2 == "E_12Li")         rReac2 = new StRNGE_12LiGSL(r, exPar[0]);
+		else if (exType2 == "asymbw")         rReac2 = new StRNGAsymmetricBWGSL(r,exPar2[0],exPar2[1],exPar2Int[0],beamA - nProt - nNeutr - 2,exPar2Int[1]);
+		else if (exType2 == "cust")           rReac2 = new StRNGCustomGSL(r,cust_file2);
+		else if (exType2 == "swave")          rReac2 = new StRNGswave(r,exPar2[0],exPar2[1]); //added by JKS 11 July 2011 for swave lineshape 
+		else if (exType2 == "bw") {
+		  StRNGCauchyGSL* rReacCauchy = new StRNGCauchyGSL(r,exPar2[0],exPar2[1]);
+		  rReacCauchy -> setGamma(exPar2[1]);                // set Gamma
+		  rReac2 = rReacCauchy;
+		} 
+  
+		if (reacType == "2body") {  //use two-body reaction class
+
+		  StReacStripEvapTwoBody* reac = new StReacStripEvapTwoBody(0.1, nNeutr, nProt, rReac);
+		  reac->setDebugSwitch(debugSwitch);
+		  reac->setRngUniform(rUniform);
+		  reac->setRngGaussQvalue(new  StRNGGaussGSL(r,0,1));
+		  reac->setQval(reacQval);
+		  reac->setQspread(reacQvalSpread);
+		  reac->setAspread(reacASpread);
+		  matTarget->addReaction(reac);
+		  reac->setLowLim(reacALowLim);
+		  reac->setUpLim(reacAUpLim);
+		  if (aDistType == "flat")
+		    {
+		      reac->setDistSwitch(0);
+		    }
+		  else if (aDistType == "gauss")
+		    {
+		      reac->setRngGaussGlauber(new StRNGGaussGSL(r,0.,reacASpread));
+		      reac->setDistSwitch(1);
+		    }
+		  else if (aDistType == "COSgauss")
+		    {
+		      reacASpread = 1-cos(reacASpread);
+		      reac->setRngGaussGlauber(new StRNGGaussGSL(r,1.,reacASpread));
+		      reac->setDistSwitch(2);
+		    }
+
+		} else if (reacType == "2neutron" || reacType == "di_neutron" || reacType == "3body_decay"){                  //use 2 Neutron decay class
+
+		  if (DecayOneFilled == 1 && DecayTotalFilled == 1)
+		    {
+		      WhichEnergyIsReconstruct = "Reconstruct2ndEnergy";
+		    } 
+		  else if (DecayTwoFilled == 1 && DecayTotalFilled == 1)
+		    {
+		      WhichEnergyIsReconstruct = "Reconstruct1stEnergy";
+		      if (exType == "TwoNeutron_seq") 
+			{
+			  WhichEnergyIsReconstruct = "TwoNeutron_seq";
+			}
+		    } 
+		  else {
+		    WhichEnergyIsReconstruct = "ReconstructTotalEnergy";
+		  }
+	   
+		  if (exType1 == "cos_twoneutron") WhichEnergyIsReconstruct = "cos_2nd";
+		  if (exType2 == "cos_twoneutron") WhichEnergyIsReconstruct = "cos_1st";
+
+		  if(exType == "Volya_2nSeq") WhichEnergyIsReconstruct = "volya2n";
+		  if(exType == "Volya_Dineutron") WhichEnergyIsReconstruct = "volyadineutron";
+
+		  cout << "WhichEnergyIsReconstruct: " << WhichEnergyIsReconstruct << endl;
+
+		  if(reacType == "2neutron"){
+	            cout << "2neutron decay selected" << endl;
+		    StReacStripEvap2neutron* reac       = new StReacStripEvap2neutron(0.1, nNeutr, nProt, rReac, rReac1, rReac2, WhichEnergyIsReconstruct);
+		    reac->setDebugSwitch(debugSwitch);
+		    reac->setRngUniform(rUniform);
+		    //reac->setRngTwoNeutron_seq(rTwoNeutron_seq);
+		    reac->setRngGaussGlauber(new StRNGGaussGSL(r,0,1));
+		    reac->setGlauberKickScale(scaleGlaub);
+		    reac->setVelocityScale(velocityshift);
+		    reac->setAsymMomentum(asymMomentum);
+		    matTarget->addReaction(reac);
+		    cout << "end of 2neutron decay selection" << endl;
+		  }
+		  else if(reacType == "di_neutron"){
+		    cout << "di_neutron reaction chosen" << endl;
+		    StReacStripEvap_dineutron* reac       = new StReacStripEvap_dineutron(0.1, nNeutr, nProt, rReac, rReac1, rReac2, WhichEnergyIsReconstruct);
+		    reac->setDebugSwitch(debugSwitch);
+		    reac->setRngUniform(rUniform);
+		    //reac->setRngTwoNeutron_seq(rTwoNeutron_seq);
+		    reac->setRngGaussGlauber(new StRNGGaussGSL(r,0,1));
+		    reac->setGlauberKickScale(scaleGlaub);
+		    reac->setVelocityScale(velocityshift);
+		    reac->setAsymMomentum(asymMomentum);
+		    matTarget->addReaction(reac);
+		  }
+		  else if(reacType == "3body_decay"){
+		    cout << "3body-decay (frag-n-n) reaction chosen" << endl;
+		    StReacStripEvap_3bodydecay* reac       = new StReacStripEvap_3bodydecay(0.1, nNeutr, nProt, rReac, rReac1, rReac2, WhichEnergyIsReconstruct);
+		    reac->setDebugSwitch(debugSwitch);
+		    reac->setRngUniform(rUniform);
+		    //reac->setRngTwoNeutron_seq(rTwoNeutron_seq);
+		    reac->setRngGaussGlauber(new StRNGGaussGSL(r,0,1));
+		    reac->setGlauberKickScale(scaleGlaub);
+		    reac->setVelocityScale(velocityshift);
+		    reac->setAsymMomentum(asymMomentum);
+		    matTarget->addReaction(reac);
+		  }
+
+		} else {                  //use "normal" reaction class
+
+		  StReacStripEvap* reac       = new StReacStripEvap(0.1, nNeutr, nProt, rReac);
+		  reac->setDebugSwitch(debugSwitch);
+		  reac->setRngUniform(rUniform);
+		  reac->setRngGaussGlauber(new StRNGGaussGSL(r,0,1));
+		  reac->setGlauberKickScale(scaleGlaub);
+		  reac->setVelocityScale(velocityshift);
+		  reac->setAsymMomentum(asymMomentum);
+		  if(kUseMomDist) reac->setRngParaMom(rMomDist);	  
+		  matTarget->addReaction(reac);
+
+		}
+
+		matTarget->setRngUniform(rUniform);
+		matTarget->setRngThickness(rUniform);
+
+#include "maps.icc"
+
+		// initialization
+		// first we save the particle as it is now
+		sys.addBLE(new StPartInitSave());
+		// then we use randomized x, tx, y, ty and energy
+		StPartInitRandomGauss* init = new StPartInitRandomGauss(rx,rtx,ry,rty,re);
+		sys.addBLE(init);
+
+		// the Be target
+		sys.addBLE(matTarget);
+
+		if (!geant){
+		  // apperture for the neutrons (edge of vacuum chamber)
+		  StAperture* aVacCham = new StApertureSquare(-0.5,0.5,-0.065,0.065);
+		  sys.addBLE(new StPropDrift(1.28));
+		  sys.addBLE(aVacCham);
+		  sys.addBLE(new StPropDrift(-1.28));   // need to drift "backwards" to the focal point of the magnet (map)
+		}
+  
+		// transport through dipole
+		StPropMapCosy* dipole = 0;
+		StPropDrift* dmona = 0;
+		if (0) ;
+		else if ( beamA - nProt - nNeutr == 14  && beamZ - nProt == 4 && beamA == 14 && beamZ == 4) { 
+		  dipole = new StPropMapCosy(m12be_jesse);
+		  dmona = new StPropDrift(monaDist - m12be_jesse.getLen());
+		  INFO("using 12Be map from Jesse Exper: 14Be->14Be*->12Be+2n\n");
+		}
+		else if ( beamA - nProt - nNeutr == 10  && beamZ - nProt == 2 && beamA == 14 && beamZ == 4) { 
+		  dipole = new StPropMapCosy(m8he_jesse);
+		  dmona = new StPropDrift(monaDist - m8he_jesse.getLen());
+		  INFO("using 8He map from Jesse Exper: 14Be->10He->8He+2n\n");
+		}
+		else if ( beamA - nProt - nNeutr == 9  && beamZ - nProt == 2 && beamA == 14 && beamZ == 4) { 
+		  dipole = new StPropMapCosy(m8he_jesse);
+		  dmona = new StPropDrift(monaDist - m8he_jesse.getLen());
+		  INFO("using 8He map from Jesse Exper: 14Be(-2p3n)->9He->8He+2n\n");
+		}
+		else if ( beamA - nProt - nNeutr == 28  && beamZ - nProt == 10 && beamA == 29 && beamZ == 11) { 
+		  dipole = new StPropMapCosy(m26ne_calem);
+		  dmona = new StPropDrift(monaDist - m26ne_calem.getLen());
+		  INFO("using 26Ne map for Calem Exper: 29Na(-p)->28Ne->26Ne + 2n\n");
+		}
+		else if ( beamA - nProt - nNeutr == 13  && beamZ - nProt == 3 && beamA == 14 && beamZ == 4) { 
+		  dipole = new StPropMapCosy(m11Li_BeBeam);
+		  dmona = new StPropDrift(monaDist - m11Li_BeBeam.getLen());
+		  INFO("using 11Li map for 05034.: 14Be->13Li->11Li + 2n\n");
+		}
+		else if ( beamA - nProt - nNeutr == 12  && beamZ - nProt == 3 && beamA == 14 && beamZ == 4) { 
+		  dipole = new StPropMapCosy(m11Li_BeBeam);
+		  dmona = new StPropDrift(monaDist - m11Li_BeBeam.getLen());
+		  INFO("using 11Li map for 05034.: 14Be(pn strip)->12Li->11Li + 1n\n");
+		}
+		else if ( beamA - nProt - nNeutr == 26  && beamZ - nProt == 8 && beamA == 27 && beamZ == 9) { 
+		  dipole = new StPropMapCosy(m24o_hope);
+		  dmona = new StPropDrift(monaDist - m24o_hope.getLen());
+		  INFO("using 24O map from 27F beam for 08026.\n");
+		} 
+		else if ( beamA - nProt - nNeutr == 25  && beamZ - nProt == 8 && beamA == 27 && beamZ == 9) { 
+		  dipole = new StPropMapCosy(m24o_hope);
+		  dmona = new StPropDrift(monaDist - m24o_hope.getLen());
+		  INFO("using 24O map from 27F beam for 08026.\n");
+		} 
+		else if ( beamA - nProt - nNeutr == 24 && beamZ - nProt == 8 && beamZ == 10) {
+		  dipole = new StPropMapCosy(m23O);
+		  dmona = new StPropDrift(monaDist - m23O.getLen());
+		} else if ( beamA - nProt - nNeutr == 23 && beamZ - nProt == 8 && beamZ == 10) {
+		  dipole = new StPropMapCosy(m22O);
+		  dmona = new StPropDrift(monaDist - m22O.getLen());
+		} else if ( beamA - nProt - nNeutr == 7  && beamZ - nProt == 2 ) {
+		  dipole = new StPropMapCosy(m6He);
+		  dmona = new StPropDrift(monaDist - m6He.getLen());
+		} else if ( beamA - nProt - nNeutr == 9  && beamZ - nProt == 3 ) {
+		  dipole = new StPropMapCosy(m8Li);
+		  dmona = new StPropDrift(monaDist - m8Li.getLen());
+		  INFO("using 8Li Map for 7He no Target");
+		} else if ( beamA - nProt - nNeutr == 11 && beamZ - nProt == 4 && nNeutr == 1) {
+		  dipole = new StPropMapCosy(m10Bea);
+		  dmona = new StPropDrift(monaDist - m10Bea.getLen());
+		} else if ( beamA - nProt - nNeutr == 11 && beamZ - nProt == 4 && nNeutr == 0) {
+		  dipole = new StPropMapCosy(m10Beb);
+		  dmona = new StPropDrift(monaDist - m10Beb.getLen());
+		} else if ( beamA - nProt - nNeutr == 12 && beamZ - nProt == 4 && nNeutr == 0) {
+		  dipole = new StPropMapCosy(m11Bec);
+		  dmona = new StPropDrift(monaDist - m11Bec.getLen());
+		} else if ( beamA - nProt - nNeutr == 25  && beamZ - nProt == 8 && beamZ == 9 && beamA == 26) {
+		  dipole = new StPropMapCosy(m24O);
+		  dmona = new StPropDrift(monaDist - m24O.getLen());
+		  INFO("using 24o map for 05039 - 26F -> 25O* -> 24O+n (Calem Experiment)");
+		} else if ( beamA - nProt - nNeutr == 27  && beamZ - nProt == 9 && beamZ == 9) {
+		  dipole = new StPropMapCosy(m26f);
+		  dmona = new StPropDrift(monaDist - m26f.getLen());
+		  INFO("using 26F map for 05039");
+		}
+		else if ( beamA - nProt - nNeutr == 24  && beamZ - nProt == 8 && beamZ == 9 && beamA == 26) {
+		  dipole = new StPropMapCosy(m23Oa);
+		  dmona = new StPropDrift(monaDist - m23Oa.getLen());
+		  INFO("using 23o map for 05039 --> zwk 26F->24O->23O+n");
+		}
+		else if ( beamA - nProt - nNeutr == 24  && beamZ - nProt == 8 && beamZ == 9) { //JDS need to remove this shit
+		  dipole = new StPropMapCosy(m22Oa);
+		  dmona = new StPropDrift(monaDist - m22Oa.getLen());
+		  INFO("using 22o map for 05039, 2neutron test bullshit");
+		} else if ( beamA - nProt - nNeutr == 23  && beamZ - nProt == 8 && beamZ == 9) {
+		  dipole = new StPropMapCosy(m22Oa);
+		  dmona = new StPropDrift(monaDist - m22Oa.getLen());
+		  INFO("using 22o map for 05039");
+		} else if ( beamA - nProt - nNeutr == 19  && beamZ - nProt == 8 && beamA == 48) {
+		  dipole = new StPropMapCosy(m18Of);
+		  dmona = new StPropDrift(monaDist - m18Of.getLen());
+		  INFO("using 18O map for 05124.\n");
+		} else if ( beamA - nProt - nNeutr == 21  && beamZ - nProt == 8 && beamA == 48) {
+		  dipole = new StPropMapCosy(m20O);
+		  dmona = new StPropDrift(monaDist - m20O.getLen());
+		  INFO("using 20O map for 05124.\n");
+		} else if ( beamA - nProt - nNeutr == 22  && beamZ - nProt == 8 && beamA == 48) {
+		  dipole = new StPropMapCosy(m21Of);
+		  dmona = new StPropDrift(monaDist - m21Of.getLen());
+		  INFO("using 21O map for 05124.\n");
+		} else if ( beamA - nProt - nNeutr == 23  && beamZ - nProt == 8 && beamA == 48) {
+		  dipole = new StPropMapCosy(m22Of);
+		  dmona = new StPropDrift(monaDist - m22Of.getLen());
+		  INFO("using 22O map for 05124.\n");
+		} else if ( beamA - nProt - nNeutr == 14  && beamZ - nProt == 5 && beamA == 48) { 
+		  dipole = new StPropMapCosy(m13B);
+		  dmona = new StPropDrift(monaDist - m13B.getLen());
+		  INFO("using 13B map for 05124.\n");
+		} else if ( beamA - nProt - nNeutr == 26  && beamZ - nProt == 10 && beamA == 48) { 
+		  dipole = new StPropMapCosy(m25Ne);
+		  dmona = new StPropDrift(monaDist - m25Ne.getLen());
+		  INFO("using 25Ne map for 05124.\n");
+		} else if ( beamA - nProt - nNeutr == 17  && beamZ - nProt == 6 && beamA == 48) { 
+		  dipole = new StPropMapCosy(m16C);
+		  dmona = new StPropDrift(monaDist - m16C.getLen());
+		  INFO("using 16C map for 05124.\n");
+		} else if ( beamA - nProt - nNeutr == 10  && beamZ - nProt == 3 && beamA == 48) {
+		  dipole = new StPropMapCosy(m9Li);
+		  dmona = new StPropDrift(monaDist - m9Li.getLen());
+		  INFO("using 9Li map for 05124.\n");
+		} else if ( beamA - nProt - nNeutr == 20  && beamZ - nProt == 8 && beamA == 48) {
+		  dipole = new StPropMapCosy(m19O);
+		  dmona = new StPropDrift(monaDist - m19O.getLen());
+		  INFO("using 19O map for 05124.\n");
+		} else if ( beamA - nProt - nNeutr == 0  && beamZ - nProt == 0 && beamA == 48) { 
+		  dipole = new StPropMapCosy(m19O);
+		  dmona = new StPropDrift(monaDist - m19O.getLen());
+		  INFO("using 48Ca map for 05124.\n");
+		} else if ( beamA - nProt - nNeutr == 12  && beamZ - nProt == 3 && beamA == 14 && beamZ == 5) { 
+		  dipole = new StPropMapCosy(m11Li);
+		  dmona = new StPropDrift(monaDist - m11Li.getLen());
+		  INFO("using 11Li map for 05034. 14B->12Li->11Li+n - zwk\n");
+		} else if ( beamA - nProt - nNeutr == 12  && beamZ - nProt == 3 && beamA == 14 && beamZ == 4) { 
+		  dipole = new StPropMapCosy(m11Li_BeBeam);
+		  dmona = new StPropDrift(monaDist - m11Li_BeBeam.getLen());
+		  INFO("using 11Li map for 05034.\n");
+		} else if ( beamA - nProt - nNeutr == 15  && beamZ - nProt == 4 && beamA == 15 && beamZ == 4) { 
+		  dipole = new StPropMapCosy(m14Be);
+		  dmona = new StPropDrift(monaDist - m14Be.getLen());
+		  INFO("Using.\n");
+		} else if ( beamA - nProt - nNeutr == 11  && beamZ - nProt == 3 && beamA == 13 && beamZ == 5) { 
+		  dipole = new StPropMapCosy(mJenna);
+		  dmona = new StPropDrift(monaDist - mJenna.getLen());
+		  INFO("Using 6He map, for 9Li.\n");
+		}
+		else if ( beamA - nProt - nNeutr == 16  && beamZ - nProt == 5 && beamA == 17 && beamZ == 6) { 
+		  dipole = new StPropMapCosy(m15B_06025);
+		  dmona = new StPropDrift(monaDist - m15B_06025.getLen());
+		  INFO("using 15B map for 06025.\n");
+		}else if ( beamA - nProt - nNeutr == 16  && beamZ - nProt == 4 && beamA == 17 && beamZ == 5) { 
+		  dipole = new StPropMapCosy(m14Be_B17beam);
+		  dmona = new StPropDrift(monaDist - m14Be_B17beam.getLen());
+		  INFO("using 14Be map from 17B beam for 06025.\n");
+		}
+
+
+		sys.addBLE(dipole);
+		
+		// CRDC1 aperture (act only on charged particles)
+		StAperture* aCRDC1 = new StApertureSquare(crdc1MaskRight, crdc1MaskLeft, -0.15, 0.15, 1);
+		sys.addBLE(aCRDC1);
+                           
+		// apperture for the fragments (CRDC2 acceptance) (act only on charged particles)
+		StAperture* aCRDC2ap = new StApertureSquare(crdc2MaskRight,crdc2MaskLeft,crdc2MaskBot,crdc2MaskTop, 1);
+		//StAperture* aCRDC2ap = new StApertureSquare(-0.15,0.15,-0.15,0.15, 1);
+		aCRDC2ap->setName("crdc2_ble");
+		sys.addBLE(new StPropDrift(crdc2dist));
+		sys.addBLE(aCRDC2ap);
+		sys.addBLE(new StPropDrift(-crdc2dist));// need to drift "backwards" to crdc1 position for dmona
+
+		// drift to Mona
+		sys.addBLE(dmona);
+
+		if (!geant){
+		  // aperture of Mona
+		  if ( exp == "05124a" || exp == "05124b" || exp == "05124c" || exp == "05124d" || exp == "05124e" || exp == "05124_Li9" || exp == "05124_O18" || exp == "05124_O19" || exp == "05124_O20" || exp == "05124_O21" || exp == "05124_O22" ) {
+		    INFO("using smaller MoNA acceptance for 05124.\n");
+		    // MoNA aperture set to smaller opening 
+		    StAperture* aMona_frag = new StApertureSquare(-0.4,0.6,-.30,.25); 
+		    sys.addBLE(aMona_frag);
+		  } else {
+		    INFO("using standard MoNA aperture size.\n");
+		    StAperture* aMona = new StApertureSquare(-1,1,-0.85,0.75); //(-1,1,-.85,.75);
+		    sys.addBLE(aMona);
+		  }
+		}
+
+		StPropDrift* d = new StPropDrift(0);
+		sys.addBLE(d);
+
+		// end of BLEs
+
+		// start setting up n-tuple or root tree
+
+		StTuple* tup = 0;
+		// setup GSL n-tuple for writing
+		if (tupleFile.find(".gsltup") != string::npos) {
+		  INFO("Writing data to GSL n-tuple in file %s",tupleFile.c_str());
+		  tup = new StGSLTuple(tupleFile);
+		} else 
+		  if (tupleFile.find(".root") != string::npos)  {
+		    INFO("Writing data to ROOT tree in file %s",tupleFile.c_str());
+		    tup = new StROOTTuple(tupleFile);
+		  } else {
+		    WAR("Data will not be written to file!");
+		  }
+
+		sys.setTupleP(tup);
+
+		// initial parameters
+		init->addNtupFields("x");
+		init->addNtupFields("tx");
+		init->addNtupFields("y");
+		init->addNtupFields("ty");
+		init->addNtupFields("Ekin");
+
+		// x-target resolution
+		StRNG*            rngTargetX = new StRNGGaussGSL(r,0,resTargetX);
+		StDetRespRNG* detRespTargetX = new StDetRespRNG(rngTargetX);
+
+		// after target target
+		matTarget->addNtupFields("x",0,detRespTargetX);
+		matTarget->addNtupFields("tx",0);
+		matTarget->addNtupFields("y",0);
+		matTarget->addNtupFields("ty",0);
+		matTarget->addNtupFields("t",0);
+		matTarget->addNtupFields("z",0);
+		matTarget->addNtupFields("TP",0);
+		matTarget->addNtupFields("dE",0);
+		matTarget->addNtupFields("Ekin",0);
+		matTarget->addNtupFields("R_exen",0);
+		matTarget->addNtupFields("R_ph",0);
+		matTarget->addNtupFields("R_th",0);
+		matTarget->addNtupFields("R_pz",0);
+
+		if (reacType == "2neutron" || reacType == "di_neutron" || reacType == "3body_decay"){
+		  matTarget->addNtupFields("R_exen2",0);
+		  matTarget->addNtupFields("R_ph2",0);
+		  matTarget->addNtupFields("R_th2",0);
+		}
+		// time resolution
+		StRNG*            rngTime = new StRNGGaussGSL(r,0,resTime);
+		StDetRespRNG* detRespTime = new StDetRespRNG(rngTime);
+
+		// CRDC1 X response
+		StRNG*            rngCRDC1X = new StRNGGaussGSL(r,0,resCRDC1X);
+		StDetRespRNG* detRespCRDC1X = new StDetRespRNG(rngCRDC1X);
+
+		// CRDC1 Y Response
+		StRNG*            rngCRDC1Y = new StRNGGaussGSL(r,0,resCRDC1Y);
+		StDetRespRNG* detRespCRDC1Y = new StDetRespRNG(rngCRDC1Y);
+
+		// CRDC1 theta X response
+		StRNG*            rngCRDC1ThetaX = new StRNGGaussGSL(r,0,resCRDC1ThetaX);
+		StDetRespRNG* detRespCRDC1ThetaX = new StDetRespRNG(rngCRDC1ThetaX);
+
+		// CRDC1 theta Y response
+		StRNG*            rngCRDC1ThetaY = new StRNGGaussGSL(r,0,resCRDC1ThetaY);
+		StDetRespRNG* detRespCRDC1ThetaY = new StDetRespRNG(rngCRDC1ThetaY);
+
+		// after dipole (at CRDC1)
+		aCRDC1->addNtupFields("x"   ,0,detRespCRDC1X);
+		aCRDC1->addNtupFields("tx"  ,0,detRespCRDC1ThetaX);
+		aCRDC1->addNtupFields("y"   ,0,detRespCRDC1Y);
+		aCRDC1->addNtupFields("ty"  ,0,detRespCRDC1ThetaY);
+		aCRDC1->addNtupFields("t"   ,0,detRespTime);
+		aCRDC1->addNtupFields("Ekin",0);
+
+		aCRDC2ap->addNtupFields("Ekin",0);
+		aCRDC2ap->addNtupFields("x",   0,detRespCRDC1X);
+		aCRDC2ap->addNtupFields("tx"  ,0,detRespCRDC1ThetaX);
+		aCRDC2ap->addNtupFields("y"   ,0,detRespCRDC1Y);
+		aCRDC2ap->addNtupFields("ty"  ,0,detRespCRDC1ThetaY);
+
+
+		// New Double Laplace Implimented by GC
+		StRNG* rngMonaX            = new StRNGDoubleLaplaceGSL(r,0,resMonaX1,0,resMonaX2,resMonaP);
+		StDetRespRNG* detRespMonaX = new StDetRespRNG(rngMonaX);
+ 
+		// Mona resp Y
+		StDetRespBin* detRespMonaY = new StDetRespBin(-.85,.75,16);
+
+		// Mona resp Z
+		StRNG* rngMonaZ            = new StRNGUniformGSL(r,-.05,.05);
+		StDetRespRNG* detRespMonaZ = new StDetRespRNG(rngMonaZ);
+
+	        cout << "Finished setting up beam line elements" << endl;
+
+		if (!resMonaBar) {
+		  detRespMonaZ = 0;
+		  detRespMonaY = 0;
+		}
+ 
+		if (geant){
+		  // Saves the data without resolutions with the geant flag
+		  // MoNA first neutron
+		  d->addNtupFields("t"   ,1,0);
+		  d->addNtupFields("x"   ,1,0);
+		  d->addNtupFields("y"   ,1,0);
+		  d->addNtupFields("z"   ,1,0);
+		  d->addNtupFields("Ekin",1);
+		  //MoNA second neutron
+		  if (reacType == "2neutron" || reacType == "di_neutron" || reacType == "3body_decay"){
+		    d->addNtupFields("t"   ,2,0);
+		    d->addNtupFields("x"   ,2,0);
+		    d->addNtupFields("y"   ,2,0);
+		    d->addNtupFields("z"   ,2,0);
+		    d->addNtupFields("Ekin",2);
+		  }
+		} else {
+		  // Saves the data with the resolutions when no geant flag is present
+		  // MoNA first neutron
+		  d->addNtupFields("t"   ,1,detRespTime);
+		  d->addNtupFields("x"   ,1,detRespMonaX);
+		  d->addNtupFields("y"   ,1,detRespMonaY);
+		  d->addNtupFields("z"   ,1,detRespMonaZ);
+		  d->addNtupFields("Ekin",1);
+		  //MoNA second neutron
+		  if (reacType == "2neutron" || reacType == "di_neutron" || reacType == "3body_decay"){
+		    d->addNtupFields("t"   ,2,detRespTime);
+		    d->addNtupFields("x"   ,2,detRespMonaX);
+		    d->addNtupFields("y"   ,2,detRespMonaY);
+		    d->addNtupFields("z"   ,2,detRespMonaZ);
+		    d->addNtupFields("Ekin",2);
+		  }
+		}  
+
+	        cout << "Running Events " << endl;	 
+		if (verbose) sys.run(nevents,"print");
+		else         sys.run(nevents,""); //"crdc2_cut" removes events not passing crdc2
+		//else         sys.run(nevents,"crdc2_cut"); //"crdc2_cut" removes events not passing crdc2
+		//Note that when using "crdc2_cut", the input number of events represents the number of events to be written!
+
+		delete tup;  // needed to be sure that data is written to file
+  
+
+
+		return 0;
+}

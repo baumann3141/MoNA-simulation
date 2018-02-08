@@ -1,0 +1,36 @@
+Project description:
+
+A number of particles should be tracked (propagated) through a system
+of beam line elements.  Beam line elements include simple drift,
+energy loss, magnet maps,... and also targets, where reactions can
+take place.  There are beam line elements (BLE) that 
+
+ - change the (z) position of a particle (drift or magnet map),
+ - do not change the position, but the energy or angle of a particle
+
+For the whole propagation the z-coordinate is the main parameter and
+no time steps are performed.
+
+The particle number can change, e.g. a reaction can take place.
+
+There can also be abstrace BLE, like 'print particle positions to
+stdout'.
+
+All BLE have a definite Z position and a drift is inserted if previous
+particle-z does not match
+
+Initialization:
+
+The particle data is initialized by an initializer (e.g. everything
+random, using phase space ellipse, using data...)
+
+
+
+Histograming and n-tuple filling:
+
+After every action certain values of the particles and results of
+action (e.g. energy loss) can be filled in histograms and n-tuple
+fields.
+
+
+

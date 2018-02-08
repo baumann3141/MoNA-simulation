@@ -1,0 +1,1 @@
+mona_analysis -if kohleyevtdata/sim-03038-geant.root -of kohleyevtdata/sim-03038-geant-anal.root -frag 6He

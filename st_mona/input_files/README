@@ -1,0 +1,15 @@
+README!
+
+These directories contain PREMADE and INCOMPLETE input files for each experiement in ST_MoNA.
+IMPORTANT: THE COSY MAP IS NOT IN THESE PREMADE FILES YOU MUST INCLUDE IT BY DOING THE FOLLOWING:
+
+You must add: cosymap = "name of cosy map";
+With that syntax, as the quotes let the code know you are inputing a string.
+
+WARNING: Watch out for whitespaces and blank lines, and possibly faulty comments (#).
+These premade files were generated on 10/22/2012
+
+-MDJ
+
+
+

@@ -1,0 +1,9 @@
+to run this in conjunction with st-mona:
+1. run st-mona as normal
+2. go to the control subdirectory 
+3. ./control.py -i <infile> -o <outfile>
+	infile = the output of st-mona
+	outfile = name of the final output file you want
+4. when geant starts, go /run/beamOn x
+	x = number of events you ran in st-mona
+5. that should do it

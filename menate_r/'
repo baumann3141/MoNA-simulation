@@ -1,0 +1,219 @@
+#include <string>
+#include <iostream>
+#include <sstream>
+#include <fstream>
+#include <vector>
+#include "TGraph.h"
+#include "TGraphErrors.h"
+#include "TAxis.h"
+#include <cstring>
+#include "TColor.h"
+#include "TF1.h"
+
+using namespace std;
+
+TGraphErrors *ReadDataErr(string filename){
+
+    ifstream inputFile(filename.c_str());
+    //ifstream inputFile("Carbon12_np12B.dat");
+    string line;
+
+    vector<double> Evec;
+    vector<double> Xvec;
+    vector<double> Xvec_err;
+
+    while(getline(inputFile, line)){
+
+    if(!line.length() || line[0] == '#') continue;
+    istringstream iss(line);
+
+    double E=0, Xsection = 0;
+    double Xsection_err = 0;
+
+  
+    iss >> E >> Xsection >> Xsection_err;
+
+    if(E!=0){
+        Evec.push_back(E);
+        Xvec.push_back(Xsection);
+        Xvec_err.push_back(Xsection_err);
+    }
+
+    cout << "point: " << E << " \t" << Xsection << endl;
+
+    }
+
+    int points = Evec.size();
+
+    cout << "# of points: " << points << endl;
+
+    const int arr_size = points;
+
+
+    double Earr[arr_size];
+    double Xarr[arr_size];
+
+    double Eerr[arr_size];
+    double Xerr[arr_size];
+
+    
+    for(int i=0;i<arr_size;i++){
+            Earr[i] = Evec[i];
+            Xarr[i] = Xvec[i];
+            Xerr[i] = Xvec_err[i];
+            Eerr[i] = 0;
+    }
+    
+    //
+    TGraphErrors *graph = new TGraphErrors(points, Earr, Xarr, Eerr, Xerr);
+    graph->GetYaxis()->SetRangeUser(0.001,0.720);
+    graph->GetXaxis()->SetRangeUser(1,100);
+    graph->SetMarkerSize(0.5);
+    graph->SetLineWidth(1);
+    graph->SetMarkerStyle(22);
+    
+    return graph;
+
+
+}
+
+TGraph* ReadData(string filename){
+
+    ifstream inputFile(filename.c_str());
+    //ifstream inputFile("Carbon12_np12B.dat");
+    string line;
+
+    vector<double> Evec;
+    vector<double> Xvec;
+    vector<double> Xvec_err;
+
+    while(getline(inputFile, line)){
+
+    if(!line.length() || line[0] == '#') continue;
+    istringstream iss(line);
+
+    double E=0, Xsection = 0;
+    double Xsection_err = 0;
+
+  
+    iss >> E >> Xsection;
+
+    if(E!=0){
+        Evec.push_back(E);
+        Xvec.push_back(Xsection);
+        //Xvec_err.push_back(Xsection_err);
+    }
+
+    cout << "point: " << E << " \t" << Xsection << endl;
+
+    }
+
+    int points = Evec.size();
+
+    cout << "# of points: " << points << endl;
+
+    const int arr_size = points;
+
+
+    double Earr[arr_size];
+    double Xarr[arr_size];
+
+    double Eerr[arr_size];
+    double Xerr[arr_size];
+
+    
+    for(int i=0;i<arr_size;i++){
+            Earr[i] = Evec[i];
+            Xarr[i] = Xvec[i];
+            //Xerr[i] = Xvec_err[i];
+            //Eerr[i] = 0;
+    }
+    
+    //
+    TGraph *graph = new TGraph(points, Earr, Xarr);
+    graph->GetYaxis()->SetRangeUser(0.001,0.720);
+    graph->GetXaxis()->SetRangeUser(1,100);
+    graph->SetMarkerSize(0.5);
+    graph->SetLineWidth(2);
+    graph->SetMarkerStyle(20);
+    
+    return graph;
+    
+    
+
+
+}
+
+
+
+
+void Plot_XSection(){
+
+    TGraph *Celastic = new TGraph();
+    Celastic = ReadData("Carbon12_el.dat");
+    
+ 
+    TGraphErrors *Cinelastic = new TGraphErrors();
+    Cinelastic = ReadDataErr("Carbon12_inel.dat");
+
+
+    TGraph *Cnnp = new TGraph();
+    Cnnp = ReadData("Carbon12_nnp11B.dat");
+    Cnnp->SetMarkerStyle(21);
+    Cnnp->SetLineColor(kOrange+1);
+
+
+    TGraph *Cnp = new TGraph();
+    Cnp = ReadData("Carbon12_np12B.dat");
+    Cnp->SetMarkerStyle(21);
+    Cnp->SetLineColor(4);
+
+    TGraph *Cnng = new TGraph();
+    Cnng = ReadData("Carbon12_nng4_4.dat");
+    Cnng->SetLineColor(2);
+
+    TGraph *Cnn3a = new TGraph();
+    Cnn3a = ReadData("Carbon12_nn3a.dat");
+    Cnn3a->SetLineColor(8);
+
+    TGraph *Cn2n = new TGraph();
+    Cn2n = ReadData("Carbon12_2n11C.dat");
+    Cn2n->SetLineColor(kMagenta);
+
+    TGraph *Cna = new TGraph();
+    Cna = ReadData("Carbon12_na9Be.dat");
+    Cna->SetLineColor(kViolet);
+    
+   
+
+
+    Celastic->Draw("ALP");
+    Cinelastic->Draw("LP");
+    Cnnp->Draw("LP");
+    Cnp->Draw("LP");
+    Cnng->Draw("LP");
+    Cnn3a->Draw("LP");
+    Cn2n->Draw("LP");
+    Cna->Draw("LP");
+
+
+
+    // functional approximation of tails for integral
+    TF1 *f1 = new TF1("f1","exp([0] + [1]*x)",40,100);
+    TF1 *f2 = new TF1("f2","exp([0] + [1]*x)",40,100);
+    TF1 *f3 = new TF1("f3","exp([0] + [1]*x)",40,100);
+    TF1 *f4 = new TF1("f4","exp([0] + [1]*x)",40,100);
+    TF1 *f5 = new TF1("f5","exp([0] + [1]*x)",40,100);
+    TF1 *f6 = new TF1("f6","exp([0] + [1]*x)",40,100);
+    TF1 *f7 = new TF1("f7","[0] + [1]*x + [2]*x*x",40,100);
+
+    f1->SetParameter(0,-1.43308);
+    f1->SetParameter(1,-0.00288358);
+
+
+
+    f1->Draw("SAME");
+
+
+
+}

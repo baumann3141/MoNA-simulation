@@ -1,0 +1,198 @@
+// C++ library includes
+#include <fstream>
+#include <vector>
+#include <sstream>
+#include <string>
+#include <assert.h>
+#include <iostream>
+// ROOT library includes
+#include <TFile.h>
+#include <TTree.h>
+#include <TBranch.h>
+#include <TObject.h>
+#include <TLorentzVector.h>
+
+using namespace std;
+
+int main(int argc, char *argv[])
+{
+    if ( argc != 3 ) // argc should be 3 for correct execution
+        // We print argv[0] assuming it is the program name
+        std::cout<<"usage: "<< argv[0] <<" <filename> <nneuts>\n";
+    else 
+    {
+        //std::cout << "args are " << argv[1] << " " << argv[2] << std::endl;
+        // First open up the root file and the temporary pythia file needed for Geant
+        TFile *inFile = new TFile(argv[1]); assert(inFile);
+        TTree *t = (TTree*)inFile->Get("t"); assert(t);
+        ofstream outFile("../temp.indat"); // pythia input file
+        ofstream macroFile("../temp.mac"); // macro file to run geant in batch mode
+
+        Int_t nneuts = atoi(argv[2]);
+        if (nneuts == 2)
+        {
+            ofstream outN2File("../neutron2temp.indat");
+            // Now we find the relevant branches to look at
+            Double_t ekin1,ekin2,x1,x2,y1,y2,z1,z2;
+            TBranch *bekin1 = t->GetBranch("b9p1Ekin");
+            TBranch *bekin2 = t->GetBranch("b9p2Ekin");
+            TBranch *bx1 = t->GetBranch("b9p1x");
+            TBranch *bx2 = t->GetBranch("b9p2x");
+            TBranch *by1 = t->GetBranch("b9p1y");
+            TBranch *by2 = t->GetBranch("b9p2y");
+            TBranch *bz1 = t->GetBranch("b9p1z");
+            TBranch *bz2 = t->GetBranch("b9p2z");
+
+            // Set addresses
+            bekin1->SetAddress(&ekin1);
+            bekin2->SetAddress(&ekin2);
+            bx1->SetAddress(&x1);
+            bx2->SetAddress(&x2);
+            by1->SetAddress(&y1);
+            by2->SetAddress(&y2);
+            bz1->SetAddress(&z1);
+            bz2->SetAddress(&z2);
+            // Get number of entries in the file
+            Int_t nevent = t->GetEntries();
+            // Tell the geant macro how many events it will need to run
+            macroFile << "/run/beamOn " << nevent << std::endl;
+            macroFile.close();
+
+            // Finally we loop over the file
+            const double mass_n = 939.565560; // mass of neutron in MeV/c^2
+            for (Int_t i = 0; i < nevent; i++)
+            {
+                TLorentzVector* neut1 = new TLorentzVector();
+                TLorentzVector* neut2 = new TLorentzVector();
+                Double_t energy1,energy2,momentum_mag1,momentum_mag2;
+                t->GetEntry(i);
+                //cout <<i<<" "<<x1<<" "<<y1<<" "<<z1<<" "<<ekin1<<" "<<x2<<" "<<y2<<" "<<z2<<" "<<ekin2<<"\n";
+                if (isnan(x1) || isnan(y1) || isnan(z1) || isnan(ekin1) || isnan(x2) || isnan(y2) || isnan(z2) || isnan(ekin2)) {
+                    outFile << "1\n";
+                    outFile << "1  2112  0  0 " << 0.00000001 << " " << 0.00000001 << " " << -0.00000001 << " " << mass_n/1000. << "\n";
+                    outN2File << "1\n";
+                    outN2File << "1  2112  0  0 " << 0.00000001 << " " << 0.00000001 << " " << -0.00000001 << " " << mass_n/1000. << "\n";
+                } else {
+                    // total energy = KE + mass
+                    energy1 = ekin1+mass_n;
+                    energy2 = ekin2+mass_n;
+                    // momentum set
+                    momentum_mag1 = sqrt(energy1*energy1 - mass_n*mass_n);
+                    momentum_mag2 = sqrt(energy2*energy2 - mass_n*mass_n);
+                    // Now set these things in the lorentz vector and convert to GeV for pythia's sake
+                    neut1->SetE(energy1/1000.);
+                    neut2->SetE(energy2/1000.);
+                    neut1->SetPz(momentum_mag1/1000.); // Pz because we can then rotate it
+                    neut2->SetPz(momentum_mag2/1000.); // Pz because we can then rotate it
+                    // Now we must calculate theta and phi
+                    Double_t rho1 = sqrt(x1*x1 + y1*y1);
+                    Double_t rho2 = sqrt(x2*x2 + y2*y2);
+                    Double_t theta1 = atan(rho1/z1);
+                    Double_t theta2 = atan(rho2/z2);
+                    Double_t phi1 = 0.;
+                    Double_t phi2 = 0.;
+                    const Double_t pi = 3.141592653589793238462643383279;
+                    // Phi is trickier because it goes from 0 to 2pi
+                    // First do first neutron
+                    if (x1==0. && y1==0.) {
+                        phi1 = 0.;
+                    } else if (y1>=0.) {
+                        phi1 = acos(x1/rho1);
+                    } else if (y1<0.) {
+                        phi1 = 2.*pi - acos(x1/rho1);
+                    }
+                    // Now do second neutron
+                    if (x2==0. && y2==0.) {
+                        phi2 = 0.;
+                    } else if (y2>=0.) {
+                        phi2 = acos(x2/rho2);
+                    } else if (y2<0.) {
+                        phi2 = 2.*pi - acos(x2/rho2);
+                    }
+                    neut1->SetTheta(theta1);
+                    neut2->SetTheta(theta2);
+                    neut1->SetPhi(phi1);
+                    neut2->SetPhi(phi2);
+
+                    outFile << "1\n";
+                    outFile << "1  2112  0  0 " << neut1->Px() << " " << neut1->Py() << " " << neut1->Pz() << " " << mass_n/1000. << "\n";
+                outN2File << "1\n";
+                    outN2File << "1  2112  0  0 " << neut2->Px() << " " << neut2->Py() << " " << neut2->Pz() << " " << mass_n/1000. << "\n";
+                }
+            }
+
+            inFile->Close();
+            outFile.close();
+            outN2File.close();
+        } else if (nneuts == 1)
+        {
+            // Here is where single neutron stuff is done
+            // Now we find the relevant branches to look at
+            Double_t ekin,x,y,z;
+            TBranch *bekin = t->GetBranch("b9p1Ekin");
+            TBranch *bx = t->GetBranch("b9p1x");
+            TBranch *by = t->GetBranch("b9p1y");
+            TBranch *bz = t->GetBranch("b9p1z");
+
+            // Set addresses
+            bekin->SetAddress(&ekin);
+            bx->SetAddress(&x);
+            by->SetAddress(&y);
+            bz->SetAddress(&z);
+            // Get number of entries in the file
+            Int_t nevent = t->GetEntries();
+
+            // Tell the geant macro how many events it will need to run
+            macroFile << "/run/beamOn " << nevent << std::endl;
+            macroFile.close();
+
+            // Finally we loop over the file
+            const double mass_n = 939.565560; // mass of neutron in MeV/c^2
+            for (Int_t i = 0; i < nevent; i++)
+            {
+                TLorentzVector* neut = new TLorentzVector();
+                Double_t energy,momentum_mag;
+                t->GetEntry(i);
+                if (isnan(x) || isnan(y) || isnan(z) || isnan(ekin) || ekin == 0.) {
+                    outFile << "1\n";
+                    outFile << "1  2112  0  0 " << 0.00000001 << " " << 0.00000001 << " " << -0.00000001 << " " << mass_n/1000. << "\n";
+                } else {
+                    // total energy = KE + mass
+                    energy = ekin+mass_n;
+                    // momentum set
+                    momentum_mag = sqrt(energy*energy - mass_n*mass_n);
+                    // Now set these things in the lorentz vector and convert to GeV for pythia's sake
+                    neut->SetE(energy/1000.);
+                    neut->SetPz(momentum_mag/1000.); // Pz because we can then rotate it
+                    // Now we must calculate theta and phi
+                    Double_t rho = sqrt(x*x + y*y);
+                    Double_t theta = atan(rho/z);
+                    Double_t phi = 0.;
+                    const Double_t pi = 3.141592653589793238462643383279;
+                    // Phi is trickier because it goes from 0 to 2pi
+                    // First do first neutron
+                    if (x==0. && y==0.) {
+                        phi = 0.;
+                    } else if (y>=0.) {
+                        phi = acos(x/rho);
+                    } else if (y<0.) {
+                        phi = 2.*pi - acos(x/rho);
+                    }
+                    neut->SetTheta(theta);
+                    neut->SetPhi(phi);
+
+                    outFile << "1\n";
+                    outFile << "1  2112  0  0 " << neut->Px() << " " << neut->Py() << " " << neut->Pz() << " " << mass_n/1000. << "\n";
+                }
+            }
+        } else
+        {
+            std::cout << "Bad number of neutrons caught by root2pythia. I am exiting\n";
+            return 1;
+        }
+        inFile->Close();
+        outFile.close();
+    }
+
+    return 0;
+}

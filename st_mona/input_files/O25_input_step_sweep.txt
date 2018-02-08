@@ -1,0 +1,34 @@
+#INFO("Using default values for experiment e12004, d,p reaction");
+	reacType	=	"no reaction";        #"no reaction, d,p"; 
+	eBeam		=	117.935; 
+	beamA		=	20; 
+    beamZ		=	8; 
+	dTarget 	=	576; #still Be target 
+	dEbeam		=	0.0;#0.0144; 
+	resTime		=	0.3; 
+	nNeutr		=	0; 
+	nProt		=	0; 
+	bSpotCx		=	0.005;#0.0036;#-0.0082768; 
+	bSpotCtx	=	-0.02;#-0.0019;#-0.00161; 
+	bSpotCy		=	0;#-0.00295;#-0.000687572;#-0.002515; 
+	bSpotCty	=	0;#-0.0005;#-0.00239; # gaussian in ty
+    bSpotDx		=	0.0;#0.0191; 
+	bSpotDy		=	0.0;#0.0097; 
+	bSpotDtx	=	0.0;#0.00765; 
+	bSpotDty	=	0.0;#0.004; #gaussian in ty
+	crdc1MaskLeft	=	0.15;
+	crdc1MaskRight	=	-0.15; 
+	crdc2MaskLeft	=	0.15; 
+	crdc2MaskRight	=	-0.1305;
+	crdc2MaskTop	=	0.15; 
+	crdc2MaskBot	=	-0.15;
+	crdc2dist	=	1.55;
+	cosymap		= 	"m24O_Jones335A"; #"m24O, beam down center"
+	fragA		=	24; 
+	fragZ		=	8; 
+    targA		=	2; 
+	targZ		=	1; 
+    target_material = "Deuterium"; #this doesn't work!
+	maxbulge 	= 	0.0000005; #[m]
+	tflatfoil	=	0.0000000125;
+

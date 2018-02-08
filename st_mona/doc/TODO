@@ -1,0 +1,169 @@
+todo
+-----
+- setup general test infrastructure, e.g. like:
+  + echo cc-file contains a shell script which has to be atomatically
+      extracted, which runs the tests
+  + implement 'test' target for Makefile
+
+- set mass from mass-file for particles and target materials
+  + setting of MeV/u and AMeV
+
+- use circular buffer to store events for event-mixing
+- change n-tuple stuff; remove histo_stuff (not needed)
+- make RNG singleton
+- automatically set certerain RNGs
+- write filtered file
+- write docu: how to run
+              how to modify
+- print command-line given
+- put cmd-line options into description of root tree
+- more detailed verbose mode for BLEs
+
+- mit Tarasov über ATIMA reden
+
+- include decay energy, theta_cm, phi_cm in verbose output
+
+- implement E-straggling (Leo page 49: formula 2.94 (need additional
+     factor z_beam*z_beam)
+
+- check spikes in deltaE[2] spectrum!!!
+
+- root tree should contain all information concerning the particles (ID),
+    maps used,...
+
+
+next (after 23O and 24O spectra for the paper are done):
+---------------------------------------------------------
+- fill n-tuple only with good events
+- implement setA and setQ for map and check that we use the right map
+- add target position (measured and reconstructed) to analyzed tree
+- try fit method for reconstruction
+- Makefile: install
+- make mona-sim and mona-ana directories...
+- calculation of stragling using energy at target center
+
+
+ntuple generation
+-------------------
+- make extra class for ntuple generation from which all BLEs are also 
+    derived...
+- setup pointer for values to be stored; if pointer not set nothing
+    gets stored
+
+
+general:
+---------
+- implement general inverse function (in StInterp) using gsl find-root
+- implement Chisquare (back-)tracking
+- add TEST routines to all *.cc files; test all classes
+- do grep PROJECT Doxyfile to get VERSION number
+- change pointers to iterators where possible
+- make C++ Class to deal with command line option
+- free dynamic storage space (gsl_histogram,...) in destructors
+- move all implementation to *.cc files
+- show fill n-tuple values in verbose mode
+- check in Makefile if root-config and gsl-config can be executed
+- understand how tuple stuff works :)
+- change name of data members to fName
+- add text tuple
+- read/write/lookup... things from mass table   
+- implement description of BLE classes
+- implement charge state distrib
+
+
+(student) projects:
+--------------------
+- complete (doxygen) documentation of *.hh files
+- implement TEST routines
+- make scripts for automatic tests
+- run simulation with everything perfect and switch on 'one' resolution
+    at a time and see what the effect is
+
+
+apertures:
+-----------
+- implement offset
+- implement rotation
+- change name of square to rectangle!!!
+
+
+particles/system:
+------------------
+- particles CANNOT be deleted!!!
+- sys.addBLE should return the BLE id so it can be used later
+
+
+st_mona:
+---------
+- print time needed to run and time needed to run say 1000 events
+
+
+reaction:
+----------
+- spec of generic RNG for neutron decay energy distribution
+
+
+energy loss:
+-------------
+- make plot of interpolation table
+- add accelerator to interpolator and test speed improvement
+- calculate straggling with central energy and not final energy 
+- take tilted trajectories into account for energy loss
+
+
+ROOT problems:
+----------------
+- root TTree:Draw("") does not return number of events
+       TTree:Draw("","") does, though
+
+map/cosy:
+----------
+- add perfect dipole -> used for analysis
+  -> to simulate things where no map is available
+- read map data from file!!!
+
+
+deb/err:
+---------
+- add macro INFOONCE, which stores the info string in a set (or map)
+  and only prints the message it was not stored before
+
+
+reaction/material:
+--------------------
+- implement materials talking to each other; for what???
+- change reaction so that one adds material, reaction, material
+    to the system and then let's the two material talk with each
+    other to keep the target thickness constant
+
+
+-8<--------------------------
+The following is just used to cut/paste into root...
+
+TTree* m0 = (TTree*) _file0->Get("at")
+TTree* m1 = (TTree*) _file1->Get("at")
+TTree* m2 = (TTree*) _file2->Get("at")
+TTree* m3 = (TTree*) _file3->Get("at")
+TTree* m4 = (TTree*) _file4->Get("at")
+TTree* m5 = (TTree*) _file5->Get("at")
+m0->Draw("exen>>h0(300,0,1")
+m1->Draw("exen>>h1(300,0,1")
+m2->Draw("exen>>h2(300,0,1")
+m3->Draw("exen>>h3(300,0,1")
+m4->Draw("exen>>h4(300,0,1")
+m5->Draw("exen>>h5(300,0,1")
+h1->Scale(.5)
+h2->Scale(.25)
+h3->Scale(.125)
+h4->Scale(.125*.5)
+h5->Scale(.125*.25)
+h0->SetLineWidth(kRed);
+h1->SetLineColor(kGreen);
+h2->SetLineColor(kBlue);
+h0->Draw();
+h1->Draw("same");
+h2->Draw("same");
+h3->Draw("same");
+h4->Draw("same");
+h5->Draw("same");
+

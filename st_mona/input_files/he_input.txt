@@ -1,0 +1,30 @@
+#INFO("Exper Jesse 14Be(-2p2n) --> 10He --> 8He + 2n " );
+	eBeam           = 59.34;
+    beamA           = 14;
+    beamZ           = 4;
+    dTarget         = 510.0; #435.0; #435.0; 445
+    dEbeam          = 0.0215; #0.0215;
+    nNeutr          = 0; #2 , 0 for 4n
+    nProt           = 2;
+	bSpotCx         = 0.0; 
+	bSpotCtx        = 0.0; 
+	bSpotCy         = 0.0; 
+	bSpotCty        = 0.0; 
+	bSpotDx         = 0.003; 
+	bSpotDy         = 0.0045; #<-- THIS IS THE ORIGINAL! 0.0045
+    bSpotDtx        = 0.006; 
+    bSpotDty        = 0.00325; #<-- ORIGINAL is 0.00325  
+    crdc1MaskLeft   = 0.15;
+	crdc1MaskRight  = -0.15;
+    crdc2dist       = 1.88; #1.88; <-- ORIGINAL CRDC POSITION!!! 1.88
+    monaDist        = 8.2;	
+	cosymap	    	= "m8he_jesse";
+	maxbulge 	    = 0.000000000005; #[m]
+	tflatfoil	    = 0.000000125; #[m]
+	fragA		    = 8.0;
+	fragZ		    = 2.0;
+	targA		    = 9.0;
+	targZ		    = 4.0;
+
+
+

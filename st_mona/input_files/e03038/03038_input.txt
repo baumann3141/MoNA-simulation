@@ -1,0 +1,22 @@
+#INFO("Using default values for experiment 03038 (Kiss 7He)");
+        eBeam           = 41.23; #40.8; --Changed by GAC, 24 Oct 2007
+        beamA           = 8;
+        beamZ           = 3;
+        dTarget         = 192.2; # from T. Baumann Oct 2006
+        dEbeam          = 0.006; 
+        resTime         = .3;
+        resTargetX      = 0.0014; # --Changed by GAC, 24 Oct 2007
+        nNeutr          = 0;
+        nProt           = 1;
+	bSpotCx         = 0.00061; # --Changed by A.Spyrou, 19 March 2008, 
+	bSpotCtx        = -0.00325; # numbers from PDY experimental forward tracking
+	bSpotCy         = -0.00015; # --Changed by A.Spyrou, 19 March 2008
+	bSpotCty        = 0.00068; # --Changed by A.Spyrou, 19 March 2008
+        bSpotDx         = 0.00392; # --Changed by A.Spyrou, 19 March 2008
+        bSpotDtx        = 0.01023; # --Changed by A.Spyrou, 19 March 2008
+        bSpotDy         = 0.00674; # --Changed by A.Spyrou, 19 March 2008
+        bSpotDty        = 0.00278; # --Changed by A.Spyrou, 19 March 2008
+        crdc1MaskLeft   =  0.073; # --Changed by A.Spyrou, 19 March 2008
+        crdc1MaskRight  = -0.15;
+        crdc2dist       = 1.00;
+        monaDist        = 8.20;

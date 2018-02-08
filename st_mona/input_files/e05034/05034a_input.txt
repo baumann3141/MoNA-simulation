@@ -1,0 +1,17 @@
+#INFO("Using default values for 05034-14B (11Li) 14B->12Li->11Li+n - zwk update");
+        eBeam           = 53.4;
+        beamA           = 14;
+        beamZ           = 5;
+        dTarget         = 470;  
+        dEbeam          = 0.0087;
+        resTime         = .3;
+        nNeutr          = 0;
+        nProt           = 2;
+        bSpotDx         = 0.004; # sigma from C. Hall Jul 17, 2007 
+        bSpotDy         = 0.016; # sigma from C. Hall Jul 17, 2007
+        bSpotDtx        = 0.023; # sigma from C. Hall Jul 17, 2007
+        bSpotDty        = 0.012; # sigma from C. Hall Jul 17, 2007
+        crdc1MaskLeft   =  0.15;
+        crdc1MaskRight  = -0.15;
+        crdc2dist       = 1.816;
+        monaDist        = 8.44;

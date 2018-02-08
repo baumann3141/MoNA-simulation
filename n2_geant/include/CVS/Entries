@@ -1,0 +1,18 @@
+/Array.hh/1.1.1.1/Fri Mar 26 21:08:53 2010//
+/Detector.hh/1.4/Thu Jun  3 20:21:52 2010//
+/DetectorConstruction.hh/1.1.1.1/Fri Mar 26 21:08:53 2010//
+/DetectorInterface.hh/1.3/Thu Jun  3 20:21:53 2010//
+/G4HadronElasticPhysics_modified.hh/1.1/Tue Jun 14 15:43:38 2011//
+/HadronPhysicsQGSP_BIC_HP_modified.hh/1.1/Tue Jun 14 15:43:39 2011//
+/InputHandler.hh/1.1.1.1/Fri Mar 26 21:08:53 2010//
+/Layer.hh/1.1.1.1/Fri Mar 26 21:08:53 2010//
+/MENATE_R_Adder.hh/1.1/Tue Jun 14 15:43:39 2011//
+/OutputHandler.hh/1.3/Mon Apr  5 20:39:36 2010//
+/PrimaryGeneratorAction.hh/1.1.1.1/Fri Mar 26 21:08:53 2010//
+/QGSP_BIC_HP_modified.hh/1.1/Tue Jun 14 15:43:39 2011//
+/QGSP_BIC_HP_modified.icc/1.1/Tue Jun 14 15:43:40 2011//
+/RandomNumberGenerator.hh/1.1/Tue Jun 14 15:43:40 2011//
+/TrackerHit.hh/1.2/Sat Apr  3 12:18:34 2010//
+/TrackerSD.hh/1.3/Thu Jun  3 20:21:53 2010//
+/menate_R.hh/1.1/Tue Jun 14 15:43:40 2011//
+D

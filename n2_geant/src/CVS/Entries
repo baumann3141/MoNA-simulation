@@ -1,0 +1,16 @@
+/Array.cc/1.1.1.1/Fri Mar 26 21:08:53 2010//
+/Detector.cc/1.8/Tue Jun 14 15:43:41 2011//
+/DetectorConstruction.cc/1.4/Tue Jun 14 15:43:41 2011//
+/DetectorInterface.cc/1.2/Tue Apr  6 16:27:41 2010//
+/G4HadronElasticPhysics_modified.cc/1.1/Tue Jun 14 15:43:41 2011//
+/HadronPhysicsQGSP_BIC_HP_modified.cc/1.1/Tue Jun 14 15:43:41 2011//
+/InputHandler.cc/1.2/Tue Jun 14 15:43:42 2011//
+/Layer.cc/1.2/Tue Jun 14 15:43:42 2011//
+/MENATE_R_Adder.cc/1.1/Tue Jun 14 15:43:42 2011//
+/OutputHandler.cc/1.7/Tue Jun 14 15:43:42 2011//
+/PrimaryGeneratorAction.cc/1.2/Tue Jun 14 15:43:42 2011//
+/RandomNumberGenerator.cc/1.1/Tue Jun 14 15:43:43 2011//
+/TrackerHit.cc/1.2/Sat Apr  3 12:17:59 2010//
+/TrackerSD.cc/1.8/Tue Jun 14 15:43:43 2011//
+/menate_R.cc/1.1/Tue Jun 14 15:43:43 2011//
+D

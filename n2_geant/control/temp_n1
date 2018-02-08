@@ -1,0 +1,52 @@
+// Then open the Geant output for the 1st neutron root file
+	    TString n1name = dirdata+"/neutron1"+uniqueID+".root";
+		cout << "Found 1st file: " << n1name << endl;
+            TFile *tempFile = new TFile(n1name); assert(tempFile);
+            TTree *tn1Temp = (TTree*)tempFile->Get("t"); assert(tn1Temp);
+
+            Double_t mh1n1Edep,mh1n1light,mh1n1t,mh1n1x,mh1n1y,mh1n1z,mh1n2Edep,mh1n2light,mh1n2t,mh1n2x,mh1n2y,mh1n2z,mh1n3Edep,mh1n3light,mh1n3t,mh1n3x,mh1n3y,mh1n3z,mh1n4Edep,mh1n4light,mh1n4t,mh1n4x,mh1n4y,mh1n4z,mh1n5Edep,mh1n5light,mh1n5t,mh1n5x,mh1n5y,mh1n5z,mh1n6Edep,mh1n6light,mh1n6t,mh1n6x,mh1n6y,mh1n6z,mh1n7Edep,mh1n7light,mh1n7t,mh1n7x,mh1n7y,mh1n7z,mh1n8Edep,mh1n8light,mh1n8t,mh1n8x,mh1n8y,mh1n8z,mh1n9Edep,mh1n9light,mh1n9t,mh1n9x,mh1n9y,mh1n9z,mh1n10Edep,mh1n10light,mh1n10t,mh1n10x,mh1n10y,mh1n10z;
+
+            Int_t mh1nmultiplicity;
+            Int_t mh1_z1; //zwk particle multiplicities
+            Int_t mh1_z2;
+            Int_t mh1_zgt2;
+            Int_t mh1_g;
+
+            string bn_n1[] = {"MoNA.Hit.1.e","MoNA.Hit.1.light","MoNA.Hit.1.t","MoNA.Hit.1.x","MoNA.Hit.1.y","MoNA.Hit.1.z",
+                    "MoNA.Hit.2.e","MoNA.Hit.2.light","MoNA.Hit.2.t","MoNA.Hit.2.x","MoNA.Hit.2.y","MoNA.Hit.2.z",
+                "MoNA.Hit.3.e","MoNA.Hit.3.light","MoNA.Hit.3.t","MoNA.Hit.3.x","MoNA.Hit.3.y","MoNA.Hit.3.z",
+                "MoNA.Hit.4.e","MoNA.Hit.4.light","MoNA.Hit.4.t","MoNA.Hit.4.x","MoNA.Hit.4.y","MoNA.Hit.4.z",
+                "MoNA.Hit.5.e","MoNA.Hit.5.light","MoNA.Hit.5.t","MoNA.Hit.5.x","MoNA.Hit.5.y","MoNA.Hit.5.z",
+                "MoNA.Hit.6.e","MoNA.Hit.6.light","MoNA.Hit.6.t","MoNA.Hit.6.x","MoNA.Hit.6.y","MoNA.Hit.6.z",
+                "MoNA.Hit.7.e","MoNA.Hit.7.light","MoNA.Hit.7.t","MoNA.Hit.7.x","MoNA.Hit.7.y","MoNA.Hit.7.z",
+                "MoNA.Hit.8.e","MoNA.Hit.8.light","MoNA.Hit.8.t","MoNA.Hit.8.x","MoNA.Hit.8.y","MoNA.Hit.8.z",
+                "MoNA.Hit.9.e","MoNA.Hit.9.light","MoNA.Hit.9.t","MoNA.Hit.9.x","MoNA.Hit.9.y","MoNA.Hit.9.z",
+                "MoNA.Hit.10.e","MoNA.Hit.10.light","MoNA.Hit.10.t","MoNA.Hit.10.x","MoNA.Hit.10.y","MoNA.Hit.10.z",
+                };
+
+            double* ps_n1[] = {&mh1n1Edep,&mh1n1light,&mh1n1t,&mh1n1x,&mh1n1y,&mh1n1z,
+                &mh1n2Edep,&mh1n2light,&mh1n2t,&mh1n2x,&mh1n2y,&mh1n2z,
+                &mh1n3Edep,&mh1n3light,&mh1n3t,&mh1n3x,&mh1n3y,&mh1n3z,
+                &mh1n4Edep,&mh1n4light,&mh1n4t,&mh1n4x,&mh1n4y,&mh1n4z,
+                &mh1n5Edep,&mh1n5light,&mh1n5t,&mh1n5x,&mh1n5y,&mh1n5z,
+                &mh1n6Edep,&mh1n6light,&mh1n6t,&mh1n6x,&mh1n6y,&mh1n6z,
+                &mh1n7Edep,&mh1n7light,&mh1n7t,&mh1n7x,&mh1n7y,&mh1n7z,
+                &mh1n8Edep,&mh1n8light,&mh1n8t,&mh1n8x,&mh1n8y,&mh1n8z,
+                &mh1n9Edep,&mh1n9light,&mh1n9t,&mh1n9x,&mh1n9y,&mh1n9z,
+                &mh1n10Edep,&mh1n10light,&mh1n10t,&mh1n10x,&mh1n10y,&mh1n10z,
+                };
+
+            for (size_t i(0); i<sizeof(ps_n1)/sizeof(double*); i++) {
+                tn1Temp->SetBranchAddress(bn_n1[i].c_str(),ps_n1[i]);  
+            }
+
+            tn1Temp->SetBranchAddress("MoNA.multiplicity",&mh1nmultiplicity);  
+            tn1Temp->SetBranchAddress("MoNA.Z1mult",&mh1_z1);  
+            tn1Temp->SetBranchAddress("MoNA.Z2mult",&mh1_z2);  
+            tn1Temp->SetBranchAddress("MoNA.ZGt2mult",&mh1_zgt2);  
+            tn1Temp->SetBranchAddress("MoNA.Gmult",&mh1_g);  
+
+            // Get number of entries in the file
+            Int_t outputn1_nevents = tn1Temp->GetEntries();
+
+

@@ -1,0 +1,281 @@
+# (un)comment for (un)optimized code
+#DDD=""
+
+# uncomment for profiling; creates 'gmon.out'; use 'gprof <prog-name>' to look at result
+#PROF=-pg
+
+#CXX=/usr/bin/g++-3.3
+
+
+# ---------------------------------------
+# no need to change anything below
+# ---------------------------------------
+
+ifdef DDD
+OPTIM=-O0 -g3
+DEBUGFLAGS=-DDEBUG
+else 
+OPTIM=-O3 -g
+endif
+
+WDIR=$(shell echo ${PWD})
+
+INCLUDE = -I $(WDIR)/../include
+# flags common for C and C++
+C_CPP_FLAGS = -W -Wall \
+                -Wconversion -Wwrite-strings -fshort-enums -fno-common \
+                $(OPTIM) $(PROF) $(DEBUGFLAGS) $(INCLUDE)
+CFLAGS      = $(C_CPP_FLAGS) -Wnested-externs \
+                -Wmissing-prototypes -Wstrict-prototypes
+CXXFLAGS    = $(C_CPP_FLAGS) $(ROOTINC)
+#LDFLAGS     = $(GSLLIB) $(ROOTLIB) -lg2c $(PROF) /usr/lib/libstdc++.so.5
+LDFLAGS     = $(GSLLIB) $(ROOTLIB) -lf2c $(PROF)
+
+# needed libs
+# if ROOT is not available uncomment the corresponding line
+# GSL is needed
+GSLLIB  = $(shell gsl-config --libs)
+ROOTINC = -DHAVE_ROOT $(shell root-config --cflags)
+#ROOTINC = $(shell root-config --cflags)
+ROOTLIB = $(shell root-config --libs) -Wl,-rpath=$(shell root-config --libdir)
+
+# executable program(s)
+BIN  = st st_mona 
+MAINS=$(patsubst %,%.o,$(BIN))
+
+
+# list of objects
+OBJS:=$(patsubst %.cc,%.o,$(wildcard *.cc)) $(patsubst %.c,%.o,$(wildcard *.c)) 
+#$(patsubst %.cxx,%.o,$(wildcard *Srim.cxx))  
+OBJS:=$(filter-out $(MAINS) mona_analysis.o,$(OBJS))
+
+.PHONY: all test
+# default target
+all: $(BIN) mona_analysis
+	mv $(BIN) mona_analysis $(WDIR)/../bin/
+
+# generates test programs (and runs tests???)
+test: TEST_st_par_mat_ia TEST_st_interp_invers
+
+TEST_%: %.cc $(OBJS)
+	$(CXX) -DDEBUG -DTEST $(CPPFLAGS) $(CXXFLAGS) $(filter-out $(patsubst %.cc,%.o,$<),$(OBJS)) $(LDFLAGS) -o $@ $<
+
+$(BIN): $(OBJS) $(MAINS)
+	$(CXX) $@.o $(OBJS) $(LDFLAGS) $(CXXFLAGS) -o $@
+#st_mona.o: CycSrim.cxx CycSrim.h
+#	$(CXX) -c $(CXXFLAGS) -o $@ $<
+#	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+.PHONY: clean distclean
+clean:
+	rm -f $(OBJS) $(MAINS) *.o $(BIN) mona_analysis $(WDIR)/../bin/st_mona $(WDIR)/../bin/mona_analysis $(WDIR)/../bin/st monaAnaDict.cxx monaAnaDict.h $(WDIR)/../include/maps.icc TEST_*
+
+distclean: clean
+	rm -rf html latex *.bak *~ *.dat *.dat.dsc *.out *.root
+
+.PHONY: doc
+doc: html/index.html
+
+html/index.html: $(wildcard *.cc *.hh) Makefile Doxyfile st.dox
+	doxygen
+	@echo
+
+.PHONY: dep
+dep:
+	makedepend -Y *.cc *.hh -- $(CPPFLAGS) 2>/dev/null
+
+
+#CycSrim.o: CycSrim.cxx
+#	$(CXX) -c $(CPPFLAGS) $(CXXFLAGS) -o CycSrim.o
+
+# objects needed for mona analysis
+mona_analysis: monaAnaDict.o st_cosy_map.o st_particle.o st_par_mat_ia.o st_material.o st_ble.o st_interp_invers.o st_system.o c_xdr_output_stream.o rageny.o 
+#CycSrim.o
+#g++ -c CycSrim.cxx
+# ROOT convention is to generate files ending in .cxx
+%.o : %.cxx
+	$(CXX) -c $(CPPFLAGS) $(CXXFLAGS) -o $@ $<
+
+monaAnaDict.cxx monaAnaDict.h: $(WDIR)/../include/mona_analysis.hh $(WDIR)/../include/MonaAnaLinkDef.h
+	rootcint -f monaAnaDict.cxx -c -p $(WDIR)/../include/mona_analysis.hh $(WDIR)/../include/MonaAnaLinkDef.h
+
+#CycSrimDict.cxx CycSrim.h: $(WDIR)/../include/CycSrim.h $(WDIR)/../include/CycSrimLinkDef.h
+#	rootcint -f CycSrimDict.cxx -c -p $(WDIR)/../include/CycSrim.h  $(WDIR)/../include/CycSrimLinkDef.h
+#	g++ -shared mona_analysis.o   
+
+#CycSrim.cxx CycSrim.h: $(WDIR)/../include/mona_analysis.hh $(WDIR)/../include/CycSrim.h $(WDIR)/../include/CycSrimLinkDef.h
+#	rootcint -f CycSrim.cxx -c $(CXXFLAGS) -p $(WDIR)/../include/mona_analysis.hh $(WDIR)/../include/CycSrim.h  $(WDIR)/../include/CycSrimLinkDef.h
+
+#CycLib.so: CycSrimDict.cxx CycSrim.cxx
+#	g++ -shared mona_analysis.o `root-config --ldflags` $(CXXFLAGS) -I$(ROOTSYS)/include $^
+
+#mona_analysis.o: CycSrim.cxx
+#	$(CXX) -c $(CPPFLAGS) $(CXXFLAGS) -o $@ $<
+
+
+st_mona.o mona_analysis.o: maps.icc 
+#mona_analysis.o: CycSrim.cxx
+#mona_analysis.o: CycSrim.cxx CycSrim.h
+#st_mona.o: CycSrim.o
+#
+maps.icc: $(WDIR)/../bin/mk_maps_icc.sh $(wildcard *.map) $(wildcard *.imap)
+	$(WDIR)/../bin/mk_maps_icc.sh >$(WDIR)/../include/$@
+
+#gcc -o mona_analysis mona_analysis.cc -L
+
+#st_material.o st_par_mat_ia.o: CycSrim.cxx
+#	$(CXX) $(CXXFLAGS) -c $< -o $@
+#st_par_mat_ia.o: CycSrim.cxx
+#	$(CXX) $(CXXFLAGS) -c $< -o $@
+#mona_analysis.o: CycSrim.cxx CycSrim.h
+
+# gnuplot latex and other stuff
+
+# latex
+%.dvi : %.tex dirname.texinp
+	- @latex -interaction=batchmode $<
+	- @bibtex $(basename $<)
+	- @latex -interaction=batchmode $<
+	- @bibtex $(basename $<)
+	- @latex -interaction=batchmode $<
+	- @latex -interaction=scrollmode $< 
+
+# ps from dvi
+%.ps : %.dvi
+	- @dvips -o $@.tmp $< >/dev/null
+	- mv $@.tmp $@
+
+# ps from gnuplot
+%.ps : %.gp
+	gnuplot $< >$@
+
+# potrace from jpg
+%.potrace.eps : %.jpg
+	djpeg $< | potrace >$@
+
+# epsi from ps
+%.epsi: %.ps
+	pstoepsi $< $@
+
+# eps from ps
+%.eps: %.ps
+	ps2eps -q -l -P -B -s b0 -n <$< >$@.tmp
+	mv $@.tmp $@
+
+# pdf from ps
+%.pdf: %.ps
+	ps2pdf $< $@
+
+# ps.gz from ps
+%.ps.gz : %.ps
+	gzip -c $< > $@
+
+# from tgif.obj to tgif.ps
+%.ps: %.obj
+	tgif -print -stdout -ps -color $< > $@
+
+# from tgif.obj to tgif.ps
+%.eps: %.obj
+	tgif -print -stdout -eps -color $< > $@
+
+# from tgif.obj to tgif.txt
+%.txt: %.obj
+	tgif -print -stdout -text $< > $@
+
+%.jpeg.ps: %.jpeg
+	jpeg2ps $< > $@
+
+%.jpg.ps: %.jpg
+	jpeg2ps $< > $@
+
+# the standard targets
+ALLTEX=$(patsubst %.tex,%.ps,$(wildcard *.tex))
+ALLTEXDVI= $(ALLTEX) $(patsubst %.tex,%.dvi,$(wildcard *.tex))  # also generate AND KEEP dvi files
+ALLGP=$(patsubst %.gp,%.eps,$(wildcard *.gp))  # gnuplot (gp) files
+
+ALLALL=$(ALLGP) $(ALLTEX) 
+.PHONY: gp
+gp: $(ALLGP)
+
+#chi_dis_2peak.eps: bw_24o_fit_2peak_list.txt
+
+# DO NOT DELETE this line and don't change anything below it
+
+c_xdr_output_stream.o: $(WDIR)/../include/c_xdr_output_stream.hh
+mona_analysis.o: $(WDIR)/../include/deb_err.h $(WDIR)/../include/mona_event.hh $(WDIR)/../include/c_xdr_output_stream.hh
+mona_analysis.o: $(WDIR)/../include/mona_analysis.hh $(WDIR)/../include/st_cosy_map.hh $(WDIR)/../include/st_par_mat_ia.hh
+mona_analysis.o: $(WDIR)/../include/st_material.hh $(WDIR)/../include/st_particle.hh $(WDIR)/../include/st_ble.hh $(WDIR)/../include/st_det_resp.hh
+mona_analysis.o: $(WDIR)/../include/st_rng.hh $(WDIR)/../include/st_interp_invers.hh $(WDIR)/../include/rageny.h maps.icc
+#mona_analysis.o: $(WDIR)/../include/st_rng.hh $(WDIR)/../include/st_interp_invers.hh maps.icc
+mona_analysis.o: $(WDIR)/../include/CycSrim.h
+st.o: $(WDIR)/../include/st_ble.hh $(WDIR)/../include/st_particle.hh $(WDIR)/../include/deb_err.h $(WDIR)/../include/st_det_resp.hh $(WDIR)/../include/st_rng.hh
+st.o: $(WDIR)/../include/st_propagate.hh $(WDIR)/../include/st_common_defs.hh $(WDIR)/../include/st_cosy_map.hh $(WDIR)/../include/st_system.hh
+st.o: $(WDIR)/../include/st_part_init.hh $(WDIR)/../include/st_histo_tuple.hh $(WDIR)/../include/st_material.hh $(WDIR)/../include/st_par_mat_ia.hh
+st.o: $(WDIR)/../include/st_interp_invers.hh $(WDIR)/../include/rageny.h $(WDIR)/../include/st_reaction.hh
+#st.o: $(WDIR)/../include/st_interp_invers.hh $(WDIR)/../include/st_reaction.hh
+st_ble.o: $(WDIR)/../include/st_ble.hh $(WDIR)/../include/st_particle.hh $(WDIR)/../include/deb_err.h $(WDIR)/../include/st_det_resp.hh $(WDIR)/../include/st_rng.hh
+st_ble.o: $(WDIR)/../include/st_system.hh $(WDIR)/../include/st_part_init.hh $(WDIR)/../include/st_histo_tuple.hh $(WDIR)/../include/st_common_defs.hh
+st_cosy_map.o: $(WDIR)/../include/st_cosy_map.hh
+st_det_resp.o: $(WDIR)/../include/st_det_resp.hh $(WDIR)/../include/st_rng.hh $(WDIR)/../include/deb_err.h
+st_histo_tuple.o: $(WDIR)/../include/st_histo_tuple.hh $(WDIR)/../include/st_det_resp.hh $(WDIR)/../include/st_rng.hh $(WDIR)/../include/deb_err.h
+st_interp_invers.o: $(WDIR)/../include/st_interp_invers.hh $(WDIR)/../include/deb_err.h
+st_material.o: $(WDIR)/../include/st_material.hh $(WDIR)/../include/st_particle.hh $(WDIR)/../include/deb_err.h $(WDIR)/../include/st_ble.hh
+st_material.o: $(WDIR)/../include/st_det_resp.hh $(WDIR)/../include/st_rng.hh $(WDIR)/../include/st_par_mat_ia.hh $(WDIR)/../include/st_interp_invers.hh
+st_material.o: $(WDIR)/../include/rageny.h $(WDIR)/../include/st_system.hh $(WDIR)/../include/st_part_init.hh $(WDIR)/../include/st_histo_tuple.hh
+#st_material.o: $(WDIR)/../include/st_system.hh $(WDIR)/../include/st_part_init.hh $(WDIR)/../include/st_histo_tuple.hh
+st_material.o: $(WDIR)/../include/st_reaction.hh
+st_mona.o: $(WDIR)/../include/st_ble.hh $(WDIR)/../include/st_particle.hh $(WDIR)/../include/deb_err.h $(WDIR)/../include/st_det_resp.hh $(WDIR)/../include/st_rng.hh
+st_mona.o: $(WDIR)/../include/st_propagate.hh $(WDIR)/../include/st_common_defs.hh $(WDIR)/../include/st_cosy_map.hh $(WDIR)/../include/st_system.hh
+st_mona.o: $(WDIR)/../include/st_part_init.hh $(WDIR)/../include/st_histo_tuple.hh $(WDIR)/../include/st_material.hh $(WDIR)/../include/st_par_mat_ia.hh
+st_mona.o: $(WDIR)/../include/st_interp_invers.hh $(WDIR)/../include/rageny.h $(WDIR)/../include/st_reaction.hh $(WDIR)/../include/st_aperture.hh
+#st_mona.o: $(WDIR)/../include/CycSrim.h
+#st_mona.o: $(WDIR)/../include/st_interp_invers.hh  $(WDIR)/../include/st_reaction.hh $(WDIR)/../include/st_aperture.hh
+st_mona.o: maps.icc
+st_par_mat_ia.o: $(WDIR)/../include/st_par_mat_ia.hh $(WDIR)/../include/st_material.hh $(WDIR)/../include/st_particle.hh $(WDIR)/../include/deb_err.h
+st_par_mat_ia.o: $(WDIR)/../include/st_ble.hh $(WDIR)/../include/st_det_resp.hh $(WDIR)/../include/st_rng.hh $(WDIR)/../include/st_interp_invers.hh
+st_par_mat_ia.o: $(WDIR)/../include/rageny.h
+st_part_init.o: $(WDIR)/../include/st_part_init.hh $(WDIR)/../include/st_ble.hh $(WDIR)/../include/st_particle.hh $(WDIR)/../include/deb_err.h
+st_part_init.o: $(WDIR)/../include/st_det_resp.hh $(WDIR)/../include/st_rng.hh
+st_particle.o: $(WDIR)/../include/st_particle.hh $(WDIR)/../include/deb_err.h
+st_propagate.o: $(WDIR)/../include/st_propagate.hh $(WDIR)/../include/st_common_defs.hh $(WDIR)/../include/st_ble.hh $(WDIR)/../include/st_particle.hh
+st_propagate.o: $(WDIR)/../include/deb_err.h $(WDIR)/../include/st_det_resp.hh $(WDIR)/../include/st_rng.hh $(WDIR)/../include/st_cosy_map.hh
+st_reaction.o: $(WDIR)/../include/st_reaction.hh $(WDIR)/../include/st_material.hh $(WDIR)/../include/st_particle.hh $(WDIR)/../include/deb_err.h
+st_reaction.o: $(WDIR)/../include/st_ble.hh $(WDIR)/../include/st_det_resp.hh $(WDIR)/../include/st_rng.hh $(WDIR)/../include/st_par_mat_ia.hh
+st_reaction.o: $(WDIR)/../include/st_interp_invers.hh $(WDIR)/../include/rageny.h $(WDIR)/../include/st_system.hh $(WDIR)/../include/st_part_init.hh
+#st_reaction.o: $(WDIR)/../include/st_interp_invers.hh $(WDIR)/../include/st_system.hh $(WDIR)/../include/st_part_init.hh
+st_reaction.o: $(WDIR)/../include/st_histo_tuple.hh
+st_rng.o: $(WDIR)/../include/st_rng.hh $(WDIR)/../include/deb_err.h
+st_system.o: $(WDIR)/../include/st_system.hh $(WDIR)/../include/st_particle.hh $(WDIR)/../include/deb_err.h $(WDIR)/../include/st_ble.hh $(WDIR)/../include/st_det_resp.hh
+st_system.o: $(WDIR)/../include/st_rng.hh $(WDIR)/../include/st_part_init.hh $(WDIR)/../include/st_histo_tuple.hh
+mona_analysis.o: $(WDIR)/../include/st_cosy_map.hh $(WDIR)/../include/st_par_mat_ia.hh $(WDIR)/../include/st_material.hh
+mona_analysis.o: $(WDIR)/../include/st_particle.hh $(WDIR)/../include/deb_err.h $(WDIR)/../include/st_ble.hh $(WDIR)/../include/st_det_resp.hh $(WDIR)/../include/st_rng.hh
+mona_analysis.o: $(WDIR)/../include/st_interp_invers.hh $(WDIR)/../include/rageny.h
+#mona_analysis.o: $(WDIR)/../include/st_interp_invers.hh 
+#MDJ
+#mona_analysis.o: $(WDIR)/../include/CycSrim.h 
+#
+mona_event.o: $(WDIR)/../include/c_xdr_output_stream.hh
+st_ble.o: $(WDIR)/../include/st_particle.hh $(WDIR)/../include/deb_err.h $(WDIR)/../include/st_det_resp.hh $(WDIR)/../include/st_rng.hh
+st_det_resp.o: $(WDIR)/../include/st_rng.hh $(WDIR)/../include/deb_err.h
+st_histo_tuple.o: $(WDIR)/../include/st_det_resp.hh $(WDIR)/../include/st_rng.hh $(WDIR)/../include/deb_err.h
+st_interp_invers.o: $(WDIR)/../include/deb_err.h
+st_material.o: $(WDIR)/../include/st_particle.hh $(WDIR)/../include/deb_err.h $(WDIR)/../include/st_ble.hh $(WDIR)/../include/st_det_resp.hh $(WDIR)/../include/st_rng.hh
+st_material.o: $(WDIR)/../include/st_par_mat_ia.hh $(WDIR)/../include/st_material.hh $(WDIR)/../include/st_interp_invers.hh $(WDIR)/../include/rageny.h
+#st_material.o: $(WDIR)/../include/st_par_mat_ia.hh $(WDIR)/../include/st_material.hh $(WDIR)/../include/st_interp_invers.hh 
+st_par_mat_ia.o: $(WDIR)/../include/st_material.hh $(WDIR)/../include/st_particle.hh $(WDIR)/../include/deb_err.h $(WDIR)/../include/st_ble.hh
+st_par_mat_ia.o: $(WDIR)/../include/st_det_resp.hh $(WDIR)/../include/st_rng.hh $(WDIR)/../include/st_par_mat_ia.hh
+st_par_mat_ia.o: $(WDIR)/../include/st_interp_invers.hh $(WDIR)/../include/rageny.h
+#st_par_mat_ia.o: $(WDIR)/../include/st_interp_invers.hh 
+st_part_init.o: $(WDIR)/../include/st_ble.hh $(WDIR)/../include/st_particle.hh $(WDIR)/../include/deb_err.h $(WDIR)/../include/st_det_resp.hh $(WDIR)/../include/st_rng.hh
+st_particle.o: $(WDIR)/../include/deb_err.h
+st_particle.o: $(WDIR)/../include/CycSrim.h
+st_propagate.o: $(WDIR)/../include/st_common_defs.hh $(WDIR)/../include/st_ble.hh $(WDIR)/../include/st_particle.hh $(WDIR)/../include/deb_err.h
+st_propagate.o: $(WDIR)/../include/st_det_resp.hh $(WDIR)/../include/st_rng.hh $(WDIR)/../include/st_cosy_map.hh
+st_reaction.o: $(WDIR)/../include/st_material.hh $(WDIR)/../include/st_particle.hh $(WDIR)/../include/deb_err.h $(WDIR)/../include/st_ble.hh
+st_reaction.o: $(WDIR)/../include/st_det_resp.hh $(WDIR)/../include/st_rng.hh $(WDIR)/../include/st_par_mat_ia.hh $(WDIR)/../include/st_interp_invers.hh
+st_reaction.o: $(WDIR)/../include/rageny.h
+st_rng.o: $(WDIR)/../include/deb_err.h
+st_system.o: $(WDIR)/../include/st_particle.hh $(WDIR)/../include/deb_err.h $(WDIR)/../include/st_ble.hh $(WDIR)/../include/st_det_resp.hh $(WDIR)/../include/st_rng.hh
+st_system.o: $(WDIR)/../include/st_part_init.hh $(WDIR)/../include/st_histo_tuple.hh
+#CycSrim.o: $(WDIR)/../include/CycSrim.h
+

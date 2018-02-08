@@ -1,0 +1,408 @@
+// C++ library includes
+// Geant4 library includes
+//#include "G4VisAttributes.hh"
+//#include "G4Colour.hh"
+#include "G4String.hh"
+#include "G4ios.hh"
+//#include "G4SDManager.hh"
+#include "globals.hh"
+#include "G4Element.hh"
+#include "G4Material.hh"
+#include "G4Box.hh"
+//#include "G4Tubs.hh"
+#include "G4LogicalVolume.hh"
+#include "G4ThreeVector.hh"
+#include "G4PVPlacement.hh"
+#include "G4EllipticalTube.hh"
+//#include "G4SubtractionSolid.hh"
+
+//#include "G4UnitsTable.hh"
+// My file includes
+#include "DetectorConstruction.hh"
+#include "TrackerSD.hh"
+
+
+DetectorConstruction::DetectorConstruction()
+{
+    detectorInfo.clear();
+    physVols.clear();
+}
+
+DetectorConstruction::~DetectorConstruction()
+{;}
+
+
+G4VPhysicalVolume* DetectorConstruction::Construct()
+{
+    //G4UnitDefinition::BuildUnitsTable();
+    //G4cout << "beginngin the detectorconstruction\n";
+    G4double a;
+    G4double z;
+    G4double density;
+    G4String name, symbol;
+    G4int ncomponents;
+    G4double fractionmass;
+
+    // This is useful to look at pre-loaded NIST materials
+    G4NistManager* NistManager = G4NistManager::Instance();
+    G4Material* Air = NistManager->FindOrBuildMaterial("G4_AIR");
+    //G4Material* Concrete = NistManager->FindOrBuildMaterial("G4_CONCRETE");
+
+    
+    /*
+    a = 15.999*g/mole;
+    G4Element *elO  = new G4Element(name="Oxygen",  symbol=" O" , z= 8., a);
+
+    a = 14.007*g/mole;
+    G4Element* elN  = new G4Element(name="Nitrogen",symbol=" N" , z= 7., a);
+    
+
+    //------------Air---------------  
+    
+    
+    density = 1.2927*mg/cm3;
+    G4Material *Air = new G4Material(name="Air ",density,ncomponents=2);
+    Air->AddElement(elO, fractionmass=30.0*perCent);
+    Air->AddElement(elN, fractionmass=70.0*perCent);
+    */
+    
+    
+
+    //------------------------------ world volume
+
+    //G4cout << "makeing world\n";
+    G4double WorldLength = 30.0*m;
+    G4double HalfWorldLength = WorldLength*0.5;
+    G4double WorldWidth = 12.0*m;
+    G4double HalfWorldWidth = WorldWidth*0.5;
+    G4double WorldHeight = 6.0*m;
+    G4double HalfWorldHeight = WorldHeight*0.5;
+    G4Box *World_box = new G4Box("World_box",HalfWorldWidth,HalfWorldHeight,HalfWorldLength);
+
+    G4LogicalVolume *World_log = new G4LogicalVolume(World_box,Air,"World_log",0,0,0);
+
+    G4VPhysicalVolume *World_phys = new G4PVPlacement(0,G4ThreeVector(0*m,0*m,0*m),"World", World_log,0,false,0);
+
+ 
+    G4double natoms;
+
+    a=1.0079*g/mole;
+    G4Element *elH = new G4Element(name="Hydrogen",symbol="H",z=1.,a);
+
+    a=2.014102*g/mole;
+    G4Element *elD = new G4Element(name="Deuterium",symbol="D",z=1.,a);
+
+    a=12.0107*g/mole;
+    G4Element *elC = new G4Element(name="Carbon",symbol="C",z=6.,a);
+
+    a=14.0067*g/mole;
+    G4Element *elN = new G4Element(name="Nitrogen",symbol="N",z=7.0,a);
+
+    a=15.9994*g/mole;
+    G4Element *elO = new G4Element(name="Oxygen",symbol="O",z=8.0,a);
+
+    a=26.982*g/mole;
+    G4Element *elAl  = new G4Element(name="Aluminum",symbol="Al", z=13., a);
+
+    a=51.996*g/mole;
+    G4Element *elCr  = new G4Element(name="Chromium",symbol="Cr", z=24., a);
+
+    a=54.938045*g/mole;
+    G4Element *elMn = new G4Element(name="Manganese",symbol="Mn",z=25.,a);
+    
+    a=55.847*g/mole;
+    G4Element *elFe  = new G4Element(name="Iron",symbol="Fe", z=26., a);
+
+    a=58.69*g/mole;
+    G4Element *elNi  = new G4Element(name="Nickel",symbol="Ni", z=28., a);
+
+    a=95.96*g/mole;
+    G4Element *elMo = new G4Element(name="Molybdenum",symbol="Mb",z=42.,a);
+
+
+    /*
+    G4Material *Steel = new G4Material(name="Steel",density,ncomponents=3);
+    Steel->AddElement(elCr,fractionmass=18*perCent);
+    Steel->AddElement(elFe,fractionmass=72*perCent);
+    Steel->AddElement(elNi,fractionmass=10*perCent);
+    */
+    //"Steel" made of plastic so that menate_R will be able to work with it.
+    //G4Material *Steel = new G4Material(name="Steel",density,ncomponents=2);
+    //Steel->AddElement(elC,fractionmass=90*perCent);
+    //Steel->AddElement(elH,fractionmass=10*perCent);
+
+
+    //------------Stainless steel------------
+    density = 7.874*g/cm3;
+    //Steel is now made of Fe after addition of Fe into Menate_R (zwk)
+    //Steel is mostly Fe, so this will work for the current time.
+    G4Material *Steel = new G4Material(name="Steel",density,ncomponents=1);
+    Steel->AddElement(elFe,fractionmass=100*perCent);
+
+    density = 2.7*g/cm3;
+    //Aluminum is also added to Menate_R for the front plate of sweeper chamber
+    G4Material *Alum = new G4Material(name="Alum",density,ncomponents=1);
+    Alum->AddElement(elAl,fractionmass=100*perCent);
+
+
+   //--------------Kapton Polyimide Film------------
+   density = 1.420*g/cm3;
+   G4Material *Kapton = new G4Material(name="Kapton",density,ncomponents=4);
+   Kapton->AddElement(elH,fractionmass=2.6362*perCent);
+   Kapton->AddElement(elC,fractionmass=69.1133*perCent);
+   Kapton->AddElement(elN,fractionmass=7.3270*perCent);
+   Kapton->AddElement(elO,fractionmass=20.9235*perCent);
+
+    
+    //The section commented out below (by zwk) was the original sweeper magnet in the G4 simulation
+    /*
+    //Defining the new sweeper -- really only a plate on the vault-side of the magnet to simulate neutrons that pass through that side before hitting MoNA (MoNA_prime or LISA really)
+    //Dimensions of plate on side of sweeper
+    //All numbers are from mechanical design drawings of sweeper and st mona (confirmed with rough measurements in the vault)
+    G4double beamLineZ = 1055*mm;
+    G4double beamLineX = 6.4*mm;
+    G4double beamLineY = 600*mm; //totally made this one up because I can't find it in the drawings!)
+    G4double halfbeamLineX = beamLineX/2;
+    G4double halfbeamLineY = beamLineY/2;
+    G4double halfbeamLineZ = beamLineZ/2;
+    //Dimensions of neutron window plate
+    G4double neutronWindowZ = 6.35*mm;
+    G4double neutronWindowX = 556.7*mm;
+    G4double neutronWindowY = 0.14*m; //taken from st mona and compared to rough measurement in vault
+    G4double halfneutronWindowX = neutronWindowX/2;
+    G4double halfneutronWindowY = neutronWindowY/2;
+    G4double halfneutronWindowZ = neutronWindowZ/2;
+    //Dimensions of magnet gap
+    G4double gapZ = 1055*mm;
+    G4double gapX = 556.7*mm;
+    G4double gapY = 0.14*m;
+    //G4double gapY = 180*mm; //testing making this bigger using number from Artemis's code -- no idea where she got it from!
+    G4double halfgapZ = gapZ/2;
+    G4double halfgapY = gapY/2;
+    //G4double halfgapX = gapX/2;
+
+    //*****zwk, doubling size of gapX because it is incorrect.  Neutron X-distribution is cutoff
+    G4double halfgapX = 4*gapX/2;
+    //******************************
+
+    //Making a big steel box for the rest of the magnet
+    G4double boxZ = 1055*mm; //make the same length as side of sweeper plate
+    G4double boxX = 800*mm;
+    G4double boxY = 1055*mm;
+    G4double halfboxZ = boxZ/2;
+    G4double halfboxX = boxX/2;
+    G4double halfboxY = boxY/2;
+    G4double gap_offset = (boxX - gapX);
+    G4double halfGap_offset = (gap_offset/2);
+    //TODO: shift in Z and X to put it in the correct position relative to the target!!!
+    //Notes about placement -- neutron window should be 1.276 m from the target and should be centered around the target, plate on side of sweeper should end when neutron window starts
+    G4double sweeperZshift = (1276 - gapZ)+halfgapZ;
+    G4double sweeperXshift = -1*halfGap_offset;
+
+    G4Box *sweeper = new G4Box("sweeper", halfboxX, halfboxY, halfboxZ);
+    G4Box *Hole = new G4Box("StHole", halfgapX, halfgapY, halfgapZ);
+    G4SubtractionSolid *magGap = new G4SubtractionSolid("magGap",sweeper,Hole,0,G4ThreeVector(gap_offset,0.*m,0.*m));
+    G4Box *sidePanel = new G4Box("sidePanel", halfbeamLineX, halfbeamLineY, halfbeamLineZ);
+    G4UnionSolid *mag = new G4UnionSolid("mag",magGap,sidePanel,G4Transform3D(G4RotationMatrix(),G4ThreeVector(halfboxX,0.*m,0.*m)));
+    G4Box *nWindow = new G4Box("nWindow",halfneutronWindowX, halfneutronWindowY, halfneutronWindowZ);
+    G4UnionSolid *fullSweeper = new G4UnionSolid("fullSweeper",mag,nWindow,G4Transform3D(G4RotationMatrix(),G4ThreeVector(gap_offset,0.*m,halfgapZ)));
+
+    G4LogicalVolume *fullSweeper_log = new G4LogicalVolume(fullSweeper, Steel, "fullSweeper_log", 0,0,0);
+    G4VPhysicalVolume *fullSweeper_phys = new G4PVPlacement(0,G4ThreeVector(sweeperXshift,0,sweeperZshift), fullSweeper_log, "fullSweep", World_log,false,0);
+    */
+    ////////////////////////////
+    // End Vault Construction //
+    ////////////////////////////
+
+
+    ////////////////////////////////////////
+    // zwk: construction of sweeper       //
+    // and chamber, measurments obtianed  //
+    // from reenan and technical drawings //
+    ////////////////////////////////////////
+
+
+    //_____Target Frame____________________
+    G4Box* tgtframe_box = new G4Box("tgtframe_box",0.5*2.54*cm, 0.5*2.54*cm, 1*mm);
+    G4Tubs* tgtframe_tub = new G4Tubs("tgtframe_tub",0*cm, 0.35*2.54*cm, 2.0*mm,0,360*deg);
+    G4SubtractionSolid *tgtframe_subtract = new G4SubtractionSolid("tgtgrame_box-tgtframe_tub",tgtframe_box,tgtframe_tub);
+
+    G4LogicalVolume *tgtframe_log = new G4LogicalVolume(tgtframe_subtract, Steel, "tgtframe_log");  // Steel
+    //G4RotationMatrix *Rot = new G4RotationMatrix;
+    //Rot->rotateY(-90.0 * 3.14 / 180.0);
+    G4VPhysicalVolume *tgtframe_phys = new G4PVPlacement(0,G4ThreeVector(0*cm, 0*cm, 0*cm), tgtframe_log, "tgtframe_phys",
+  										  World_log, false, 0); 
+ 
+    //______Crude Approximation of Target Cell for LD2 Target__________
+    /*double outer_radius = 2*cm; 
+    double inner_radius = 1*cm;
+    double thickness = 30*mm; // Thickness of target cell
+    double k_thickness = 0.125*mm; // Thickness of Kapton Foil
+   
+    G4Tubs* ld_tgtframe_tub = new G4Tubs("ld_tgtframe_tub",inner_radius,outer_radius,thickness,0,360*deg); // LD2 target frame
+    G4Tubs* tgtframek_tub = new G4Tubs("tgtframek_tub",0*cm,outer_radius,k_thickness,0,360*deg); // Kapton Cover <- CHECK THE ORIENTATION OF YOUR TUBES    
+  
+    G4LogicalVolume *ld_tgtframe_log = new G4LogicalVolume(ld_tgtframe_tub, Steel, "ld_tgtframe_log");  // Steel
+    G4LogicalVolume *tgtframek_log = new G4LogicalVolume(tgtframek_tub, Kapton, "tgtframek_log"); 
+
+    //G4RotationMatrix *Rot = new G4RotationMatrix;
+    //Rot->rotateY(-90.0 * 3.14 / 180.0);
+    G4VPhysicalVolume *ld_tgtframe_phys = new G4PVPlacement(0,G4ThreeVector(0*cm, 0*cm, 0*cm), ld_tgtframe_log, "tgtframe_phys",
+  										  World_log, false, 0); 
+    G4VPhysicalVolume *tgtframek_phys_front = new G4PVPlacement(0,G4ThreeVector(0*cm, 0*cm, 0*cm), tgtframek_log, "tgtframe_phys",
+  										  World_log, false, 0); 
+    G4VPhysicalVolume *tgtframek_phys_back = new G4PVPlacement(0,G4ThreeVector(0*cm, 0*cm, thickness), tgtframek_log, "tgtframe_phys",
+  										  World_log, false, 0); */
+
+    //______Build chamber in between the Sweeper Coils_____________
+    //top panel of chamber
+    double chamber_top_Z = 1061.4*mm;
+    double chamber_top_X = 527.65*mm;
+    double chamber_top_Y = 6.35*mm;
+
+    G4Box *chamber_top = new G4Box("chamber_top",0.5*chamber_top_X, 0.5*chamber_top_Y, 0.5*chamber_top_Z); 
+    //MM - top of chamber
+    G4LogicalVolume *chamber_top_log = new G4LogicalVolume(chamber_top, Steel, "chamber_top_log");
+
+    //Z distance
+    double distance_tgt_to_chamberBack = 231.3*mm;
+    double distance_tgt_to_chamberCenter = distance_tgt_to_chamberBack + 530.7*mm;
+
+    //X offset of chamber 
+    //This is used if the chamber is offset with respect to beam axis
+    //Reenan's drawings indicate that there is NO offset.
+    double chamber_offset = 0*cm;//shift chamber relative to LD2 target
+    
+    //Y height of top
+    double chamber_height = 7*cm + 0.5*chamber_top_Y;
+
+    G4VPhysicalVolume *chamber_top_phys = new G4PVPlacement(0, G4ThreeVector(chamber_offset, chamber_height, distance_tgt_to_chamberCenter), chamber_top_log, "chamber_top_phys", World_log, false, 0);
+
+    //bottom panel of chamber
+    double chamber_bot_Z = chamber_top_Z;
+    double chamber_bot_X = chamber_top_X;
+    double chamber_bot_Y = chamber_top_Y;
+
+    G4Box *chamber_bot = new G4Box("chamber_bot",0.5*chamber_bot_X, 0.5*chamber_bot_Y, 0.5*chamber_bot_Z); 
+    //MM - bottom of the chamber
+    G4LogicalVolume *chamber_bot_log = new G4LogicalVolume(chamber_bot, Steel, "chamber_bot_log");
+
+    G4VPhysicalVolume *chamber_bot_phys = new G4PVPlacement(0, G4ThreeVector(chamber_offset, -1*chamber_height, distance_tgt_to_chamberCenter), chamber_bot_log, "chamber_bot_phys", World_log, false, 0);
+
+    //front panel
+    double chamber_front_Z = 0.5 * 2.54*cm;
+    double chamber_front_X = 22.0 * 2.54*cm;
+    double chamber_front_Y = 12.0 * 2.54*cm;
+    G4Box *chamber_front = new G4Box("chamber_front",0.5*chamber_front_X, 0.5*chamber_front_Y, 0.5*chamber_front_Z); 
+    //MM - front plate of the chamber
+    G4LogicalVolume *chamber_front_log = new G4LogicalVolume(chamber_front, Alum, "chamber_front_log");
+
+    //                                                                         set just in front of chamber (5% extra for safety in Geant4)
+    double chamber_front_Zdist = distance_tgt_to_chamberBack + chamber_top_Z + 1.1*chamber_front_Z*0.5;
+    double chamber_front_Xoffset = chamber_offset;
+
+    G4VPhysicalVolume *chamber_front_phys = new G4PVPlacement(0, G4ThreeVector(chamber_front_Xoffset,0*cm,chamber_front_Zdist), chamber_front_log, "chamber_front_phys", World_log, false, 0);
+    
+    
+    //side panel
+    double chamber_side_Z = chamber_top_Z;
+    double chamber_side_X = 6.35*mm;
+    double chamber_side_Y = 177.8*mm;
+    G4Box *chamber_side = new G4Box("chamber_side",0.5*chamber_side_X, 0.5*chamber_side_Y, 0.5*chamber_side_Z); 
+    //MM - side plate of the chamber
+    G4LogicalVolume *chamber_side_log = new G4LogicalVolume(chamber_side, Steel, "chamber_side_log");
+    
+    //                                                                         set just in front of chamber (5% extra for safety in Geant4)
+    double chamber_side_Zdist = distance_tgt_to_chamberCenter;
+    double chamber_side_Xoffset = chamber_offset + 0.5*chamber_top_X + 0.5*chamber_side_X*1.1;
+
+    G4VPhysicalVolume *chamber_side_phys = new G4PVPlacement(0, G4ThreeVector(chamber_side_Xoffset,0*cm,chamber_side_Zdist), chamber_side_log, "chamber_side_phys", World_log, false, 0);
+
+    
+    //_______Build top and bottom of sweeper magnet_______
+    double sweep_top_X = 21.531 * 2.54*cm;
+    double sweep_top_Y = 42.584 * 2.54*cm;
+    double sweep_top_Z = 110*cm; //~ 3.5 feet
+
+    G4EllipticalTube *sweep_top_tube = new G4EllipticalTube("sweep_top_tube", 0.5*sweep_top_X, 0.5*sweep_top_Y, 0.5*sweep_top_Z);
+    //MM - top sweeper magnet
+    G4LogicalVolume *sweep_top_log = new G4LogicalVolume(sweep_top_tube, Steel, "sweep_top_log");
+
+    double sweep_top_Zdist = distance_tgt_to_chamberCenter;
+    double sweep_top_Ydist = chamber_height*1.1 + 0.5*chamber_top_Y + 0.5*sweep_top_Z;
+
+    //need additional offset to place magnet on the chamber
+    double sweep_chamber_Xoffset = -50*mm;
+
+    double sweep_top_Xoffset = chamber_offset + sweep_chamber_Xoffset;
+
+    G4RotationMatrix *Rot = new G4RotationMatrix;
+    Rot->rotateX(-90.0 * 3.14 / 180.0);
+    Rot->rotateZ(-18.4 * 3.14 / 180.0);
+    G4VPhysicalVolume *sweep_top_phys = new G4PVPlacement(Rot, G4ThreeVector(sweep_top_Xoffset,sweep_top_Ydist,sweep_top_Zdist), sweep_top_log, "sweep_top_phys", World_log, false, 0);
+
+    //bottom
+    double sweep_bot_X = sweep_top_X;
+    double sweep_bot_Y = sweep_top_Y;
+    double sweep_bot_Z = sweep_top_Z; //~ 3.5 feet
+
+    G4EllipticalTube *sweep_bot_tube = new G4EllipticalTube("sweep_bot_tube", 0.5*sweep_bot_X, 0.5*sweep_bot_Y, 0.5*sweep_bot_Z);
+    //MM - bottom sweeper magnet
+    G4LogicalVolume *sweep_bot_log = new G4LogicalVolume(sweep_bot_tube, Steel, "sweep_bot_log");
+
+    double sweep_bot_Zdist = distance_tgt_to_chamberCenter;
+    double sweep_bot_Ydist = -1 * sweep_top_Ydist;
+
+    //need additional offset to place magnet on the chamber
+    //double sweep_chamber_Xoffset = -50*mm;
+
+    double sweep_bot_Xoffset = sweep_top_Xoffset;
+
+    //G4RotationMatrix *Rot = new G4RotationMatrix;
+    //Rot->rotateX(-90.0 * 3.14 / 180.0);
+    //Rot->rotateZ(-18.4 * 3.14 / 180.0);
+    G4VPhysicalVolume *sweep_bot_phys = new G4PVPlacement(Rot, G4ThreeVector(sweep_bot_Xoffset,sweep_bot_Ydist,sweep_bot_Zdist), sweep_bot_log, "sweep_bot_phys", World_log, false, 0);
+
+    
+
+
+    ///////////////////
+    // Detector Loop //
+    ///////////////////
+    // Sensitive detector manager
+    /*
+    G4SDManager* SDman = G4SDManager::GetSDMpointer();
+    G4String trackerChamberSDname = "ExN02/TrackerChamberSD";
+    ExN02TrackerSD* aTrackerSD = new ExN02TrackerSD( trackerChamberSDname );
+    SDman->AddNewDetector( aTrackerSD );
+    logicChamber->SetSensitiveDetector( aTrackerSD );
+    */
+    // TODO: unify the names... some are singular, some are plural
+    //Outside loop over arrays
+    //G4cout << "I am gonna enter the detector creation loop\n";
+    for (G4int i = 0; i < detectorInfo.size(); i++)
+    {
+        // Inside loop over layers
+        //TODO: change to pointer... can you access these attributes like this?
+        for (G4int j = 0; j < detectorInfo[i]->getLayers().size(); j++)
+        {
+            // Innermost loop over detectors
+            for (G4int k = 0; k < detectorInfo[i]->getLayers()[j]->getDetectors().size(); k++)
+            {
+                Detector* currentDet = detectorInfo[i]->getLayers()[j]->getDetectors()[k];
+
+                // the args needed here are a rotation matrix, position vector, logical volume,
+                // name, the world volume its in
+                //TODO: get the rotation matrix in
+                //addPhysVol(new G4PVPlacement(currentDet->getRotation(),
+                //            currentDet->getPosition(),
+                //            currentDet->getLogVol(),currentDet->getName(),World_log,false,0));
+                currentDet->addPhysVol(World_log);
+            }
+        }
+    }
+
+    //========================== Visualization attributes =========================================//
+    World_log->SetVisAttributes(G4VisAttributes::Invisible);
+    return World_phys;
+}
