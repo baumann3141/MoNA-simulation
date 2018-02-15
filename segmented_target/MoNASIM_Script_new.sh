@@ -52,7 +52,7 @@ printf "Reaction Target:      ${TargetID}\n"
 #fi
 
 ### Set the name for the output root files here ###
-FileName="ST_F27O24"
+FileName="ST_Be-13"
 
 ### Here is where you set the incident beam parameters,
 ### the glauber kick, the reaction type and parameters.
@@ -61,21 +61,22 @@ FileName="ST_F27O24"
 ### examples to demonstrate how i've simulated different
 ### decays:
 
-#### ---- e15118 O26 -> O24 + 2n ---- ####
+#### ---- PAC42 Be-13 -> Be-12 + n ---- ####
 
-#### O-24 from F-27 ####
-arguments=" -exp 15118_O26 -geant -glaub 0.5 -be 105.652 -dbe 3.0 -reac 3body_decay -lifetime 0 -e const 0.05 -n 1000 -ctx 0.003 -cty -0.002 -cx 0.012 -cy -0.016 -dtx 0.00001 -dty 0.00001 -dx 0.00001 -dy 0.00001 -slice ${TargetID}" #-n number of events.
+#### Be-12 from Be-13 ####
+arguments=" -exp PAC42_Be-13 -geant -glaub 0.5 -be 60.0 -dbe 0.0 -reac glaub -e swave 1.78 10 -n 1000 -slice ${TargetID} -strag 1" #-n number of events.
 
 
 ### The geant simulation is controlled through a python script control.py
 ### (-n number of neutrons)
 #controlargs="-n 1 -m manual -s vison"
 #controlargs="-n 2"
-controlargs="-n 2 -g ${TargetID}"
+#controlargs="-n 2 -g ${TargetID}"
 #controlargs="-n 2 -g 1"
+controlargs="-n 1 -g ${TargetID}"
 
 #fragment for mona_analysis.cc
-FRAGname="O24"
+FRAGname="Be-12"
 
 ### Specify the MoNA Detector Config File which
 ### should sit in the n2_geant/ directory

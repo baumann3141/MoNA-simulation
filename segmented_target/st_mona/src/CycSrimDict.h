@@ -31,7 +31,6 @@ extern void G__set_cpp_environmentCycSrimDict();
 
 #include "TObject.h"
 #include "TMemberInspector.h"
-//#include "/projects/mona-sim/jonesm/st_mona/src/../include/CycSrim.h"
 #include "/projects/mona-sim/baumann/st_mona/src/../include/CycSrim.h"
 #include <algorithm>
 namespace std { }

@@ -341,8 +341,10 @@ int main (size_t argc, char** argv) {
   printf("\nProgram Simple-Track (st)        Heiko Scheit (scheit@nscl.msu.edu)\n");
   printf("Compiled on " __DATE__ " at " __TIME__ ".\n\n");
 
-  string INPUT_DATA_DIR = "/projects/mona-sim/redpath/st_mona/input_files/";
-  string INPUT_FILE     = "O24_input.txt";
+  string INPUT_DATA_DIR = "/projects/mona-sim/baumann/st_mona/input_files/";
+  string INPUT_FILE     = "Be-13_input.txt";
+  //string INPUT_DATA_DIR = "/projects/mona-sim/redpath/st_mona/input_files/";
+  //string INPUT_FILE     = "O24_input.txt";
   //string INPUT_FILE     = "O23_input_dL16397.txt"; // O23-> O22 + 1n
   //string INPUT_FILE     = "O25_input_dL16397.txt";// nitrogen 21
   //string INPUT_FILE = "input_file_temp.txt"; 
@@ -910,6 +912,7 @@ int main (size_t argc, char** argv) {
      else if( exp == "12004_dp")    		    INFO("Using default values for experiment e12004, d,p reaction"); // 25O to 24O, propulated by a (d,p) reaction
      else if( exp == "15118_O26")		INFO("Using default values for experiment e15118, 26O --> 24O + 2n");
      else if( exp == "15118_O22")		INFO("Using default values for experiment e15118, 22O");
+     else if( exp == "PAC42_Be-13")		INFO("Using default values for experiment PAC42, Be-13 --> Be-12 + n");
     
      else ERR("Unknown Experiment %s.",exp.c_str());
     }
@@ -932,10 +935,13 @@ int main (size_t argc, char** argv) {
   double si3t=32.9582;
 
   // e15118 measured Be target thicknesses, converted from [um] in LISE++
-  double be1t=757.68;
-  double be2t=690.4128;
-  double be3t=610.2096;
-
+  //double be1t=757.68;
+  //double be2t=690.4128;
+  //double be3t=610.2096;
+  // PAC42 nominal target thickness for segmented target layers
+  double be1t=dTarget;
+  double be2t=dTarget;
+  double be3t=dTarget;
   TFile *f = new TFile(tupleFile.c_str(),"recreate");// assert(outFile);
   TTree *pt = new TTree("pt","Parameter Tree");// assert(tOut);
 
@@ -1202,7 +1208,7 @@ int main (size_t argc, char** argv) {
       matTarget->setThickness(dTarget);          
     }
 
-    	else if (exp == "15118_O26"){
+    	else if (exp == "PAC42_Be-13"){
 	  INFO("using Segmented Target.\n");
 	  matTarget->addElement(Be9);
 //	  matTarget->setThickness(dTarget);
@@ -1939,7 +1945,7 @@ int main (size_t argc, char** argv) {
   sys.addBLE(init);
 
   // Add the Be target
-  if(exp == "15118_O26"){
+  if(exp == "PAC42_Be-13"){
     if(SliceIdx == 1){
       sys.addBLE(activeTarSi0);
       sys.addBLE(matTarget);
@@ -2451,7 +2457,7 @@ int main (size_t argc, char** argv) {
 
   // Add the Be target
   /*  */
-  if(exp == "15118_O26"){
+  if(exp == "PAC42_Be-13"){
     activeTarSi0->addNtupFields("x",0,0);// detRespTargetX
     activeTarSi0->addNtupFields("tx",0);
     activeTarSi0->addNtupFields("y",0);

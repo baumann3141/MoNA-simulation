@@ -64,7 +64,7 @@ FileName="ST_F27O24"
 #### ---- e15118 O26 -> O24 + 2n ---- ####
 
 #### O-24 from F-27 ####
-arguments=" -exp 15118_O26 -geant -glaub 0.5 -be 105.652 -dbe 3.0 -reac 3body_decay -lifetime ${LIFETIME} -e const 0.05 -n 1000 -ctx 0.003 -cty -0.002 -cx 0.012 -cy -0.016 -dtx 0.00001 -dty 0.00001 -dx 0.00001 -dy 0.00001 -slice ${TargetID}" #-n number of events.
+arguments=" -exp 15118_O26 -geant -glaub 0. -be 105.652 -dbe 0.00001 -reac 3body_decay -lifetime ${LIFETIME} -e const 0.05 -n 1000 -ctx 0.0 -cty -0.0 -cx 0.00 -cy -0.0 -dtx 0.00001 -dty 0.00001 -dx 0.00001 -dy 0.00001 -slice ${TargetID}" #-n number of events.
 
 
 ### The geant simulation is controlled through a python script control.py
@@ -108,7 +108,7 @@ analysispath="/mnt/simulations/MoNAsims/baumann"
 DataPath="/mnt/simulations/MoNAsims/baumann"
 
 #used to allow multiple geant runs simultaneously 
-UniqueID="_CycSrimANDdEfix_NoRxn_${TargetID}"
+UniqueID="_CycSrimANDdEfix_${TargetID}"
 
 #Make file names based on the file name given.
 PreGeant=${DataPath}/${FileName}"${UniqueID}.root"

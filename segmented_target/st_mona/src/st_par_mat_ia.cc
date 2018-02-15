@@ -232,6 +232,19 @@ double StRageny::do_de_foil(StMaterial* m, double thickness, StParticle* p){
     dE *= thickness;
     dE = dE/(p->getA());
   }
+  // THR 14 February 2018 added fits to Be-14 and Be-12 dE/dx vs Einc
+  // to calculate energy loss in silicon
+  if (p->getZ() == 4 && p->getA()==14){
+    dE = 3.26485 / pow(etotal,0.778487);
+    dE *= thickness;
+    dE = dE/(p->getA());
+  }
+  if (p->getZ() == 4 && p->getA()==12){
+    dE = 3.14257 / pow(etotal,0.768608);
+    dE *= thickness;
+    dE = dE/(p->getA());
+  }
+
 
   double final_ke = etotal - dE;
   p->setGammaMinOneU(final_ke);

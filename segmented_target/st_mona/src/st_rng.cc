@@ -1297,12 +1297,13 @@ StRNGswave::StRNGswave(StGSLrng* rr, double gamma, double scatlen)
 
   //Approximate starting value for min
   //Empirically observed that in kspace, minima occur roughly every pi/(a-0.5). Must be converted to xspace. - JKS
-  min = pow(pi*hbar/(scatlen-0.5),2)/(2*mu);
+/*  min = pow(pi*hbar/(scatlen-0.5),2)/(2*mu);
   limit1 = 0.5*min;
   limit2 = 1.5*min;
   min = swavePdf->GetMinimumX(limit1,limit2);
   min = std::min(min,10.);
-  swavePdf->SetRange(0,min);
+  swavePdf->SetRange(0,min);*/
+  swavePdf->SetRange(0,10); //s-wave lineshape cut off in MeV
 }
 
 double
