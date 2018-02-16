@@ -1,0 +1,501 @@
+/** \file
+ * Implementation of material classes.
+ */
+
+#include "st_material.hh"
+#include "st_system.hh"
+#include "st_histo_tuple.hh"
+#include "st_reaction.hh"
+
+#include "deb_err.h"
+#include "CycSrim.h"
+#include <fstream>
+#include <iostream>
+
+ofstream fout;
+
+void StMaterial::addElement(StElement e) {
+    
+    fout.open("outfile.txt");
+    fElem.push_back(e);
+    fTotalAb += e.geta();
+}
+
+  
+void StMaterial::set(string mat) {  /// \todo load predefined material if known by name
+    mat="";
+    return;
+}
+
+
+int StMaterial::cleanUp() {
+    
+    fEnergyLoss.clear();
+    fTargetPos.clear();
+    return 0;
+}
+
+
+int StMaterial::act(StParticle* p) {
+    
+    int doReaction;
+    doReaction = 0;
+  
+    // Calculate additional thickness due to bulge
+    double bx; // beam spot x-pos  [m]
+    double by; // beam spot y-pos  [m]
+    double R;  // beam spot radius, R^2 = bx^2 + by^2 [m]
+        bulge += 0.000000000001; // size of bulge [m] This is to prevent dividing by zero.
+    
+    double length = 0.019; // length from center of foil to edge [m] (1.9 cm)
+    double density = 171.5; // density of D2 in kg/m^3
+    double kdensity = 1420; // density of Kapton in kg/m^3
+
+    double thickness = 0.0235; // [m] physical thickness of flat foil
+    double bthick; // [mm] thickness accounting for bulge
+    double dbthick; // [mm] total thickness of foils
+
+    double dbulge = bulge + flatfoil; // [m] additional bulge due to thickness;
+
+    double alpha; // angle [rad]
+    double dalpha; // angle for foil
+    double Rc; // distance from center of gas to where beam hits [m]
+    double dRc; // distance from center of foil to where beam hits [m]   
+    double tfoil;//
+        tfoil += 0.000000000001;// again to vaoid dividing by zero
+    double T; // total thickness foils included
+
+    bx = p->getx();
+    by = p->gety();
+
+
+    R = sqrt(pow(bx,2)+pow(by,2));
+	// no bulge
+ /*
+    if(R <= length){// Check that beampspot is inside foil
+        
+        Rc = (pow(length,2)+pow(bulge,2))/(2*bulge);
+        alpha = asin(R/Rc);
+        
+        bthick = 2*(Rc*(cos(alpha)-1) + bulge) + thickness;
+    
+        bthick = bthick*density*100; //[mg/cm^2];
+	bthick = abs(bthick);
+        fThickness = bthick; // thickness of bulge
+    
+    
+        // bulge from foil
+    
+        dRc = (pow(length+flatfoil,2)+pow(dbulge,2))/(2*dbulge);
+        dalpha = asin(R/dRc);
+        tfoil = dRc*(cos(dalpha) - 1) + dbulge - ( Rc*(cos(alpha) - 1) + bulge );
+        tfoil = tfoil*kdensity*100; //[mg/cm^2]
+
+	tfoil = abs(tfoil);
+
+    
+        // Flat foil    
+        fThickness = bthick + 2*tfoil; // thickness of bulge + foil  
+        // NOTE: dbthick is thickness in mg/cm^2 of KAPTON assuming the entire target is this material (WITCH IT IS NOT!)
+    }
+    
+  else{
+    WAR("R value extends beyond physical target!");
+  }*/
+
+  if (fReactions.size() && fTotReacProb > 0 ) {
+      if (!fRngUniform) ERR("Need a uniform RNG since reactions are defined.");
+      
+      double r;
+      r=fRngUniform->value(0,1);
+      r=0;  DEB("remove this line"); /// \todo remove this line !!!
+      DSV(r);
+      DSV(fTotReacProb);
+    
+      if (r < fTotReacProb) doReaction = 1;
+  }
+
+  //____________________ NO REACTION ________________________
+  if ( ! doReaction  ) {
+      DEB("No reaction");
+      
+      double de, strag;				      
+      de = fPMInt->do_de(this,bthick,p)*p->getA();              
+      DSV(de);
+      
+      strag = fPMInt->stragAng(this, bthick,p,fStragAngScale);
+      DSV(strag);
+
+      fEnergyLoss.push_back(de); // save energyLoss for later histo or tuple action
+      fStragAng.push_back(strag);//
+      fTargetPos.push_back(-7);  // no reaction -> no target position
+    
+      return 0;
+  } 
+  //____________________ YES REACTION _______________________
+  else {
+
+    DEB("Yes reaction");
+    
+    if (!fRngThick) {
+        WAR("Need random number generator for determining the interaction point in the target.\n"
+            "None is set.  Using Uniform distribution.");
+        fRngThick = fRngUniform;
+    }
+
+    // 3 cases are neccessary to account for the possible reaction points:
+    // 		the reaction can happen in the foil, then propogate through D2 and more foil
+    // 		or it can pass through foil, happen in D2, and pass through foil again
+    // 		or pass through foil AND D2 and happen in the exiting foil
+
+    double d;  // position where reaction happens
+    double de,strag; // energy loss and strag angle (accumulative)
+    d = fRngThick->value(0,fThickness);
+	//cout << "de: " << fPMInt->do_de(this,d,p)*p->getA() << endl;
+     
+   // cout << "d: " << d <<  " tfoil: " << tfoil << " bthick: " << bthick << " fThickness: " << fThickness << endl;
+
+
+    //------------------------- NO STUPID FOILS
+    if(d > 0){ 
+	//d = fRngThick->value(0,fThickness);
+	     
+    	//cout << "d: " << d <<  " tfoil: " << tfoil << " bthick: " << bthick << " thickness: " << fThickness << endl;
+	//cout << "NO FOIL" << endl;
+        DSV(d);
+        fTargetPos.push_back(d);  // save for histos/tuples
+        // energy loss and straggling before
+        de = fPMInt->do_de(this,d,p); // propagate up to reaction point
+        strag = fPMInt->stragAng(this,d,p,fStragAngScale); 
+    
+        double r;   // random number for which reaction to choose
+        double ps;  // probability sum
+        r = fRngUniform->value(0,fTotReacProb);
+        ps=0;
+
+        vector<StReaction*>::const_iterator ireac;
+    
+        for (ireac = fReactions.begin(); ireac != fReactions.end(); ireac++) {
+            DEB("Considering reaction %s.",(*ireac)->getName().c_str());
+            ps += (*ireac)->getProb();    
+        
+            if (r < ps) break;
+        }
+    
+        DEB("Using reaction %s.",(*ireac)->getName().c_str());
+        DSV(r); DSV(ps);
+
+        if (r > ps) ERR("r > ps %f %f",r,ps);
+
+        size_t id = p->getID();  /// need to save id, in case act screws up the pointer \todo fix this!!!
+    
+        vector<StParticle> newPart;
+    
+        DEB("Doing reaction %s.",(*ireac)->getName().c_str());
+        (*ireac)->act(p, &newPart);
+    
+        // add new particles to the system
+        StSystem* sp;
+        sp = getSystemP(); 
+    
+        if (!sp) ERR("System pointer not set.");
+    
+        for (vector<StParticle>::const_iterator ppp = newPart.begin(); ppp != newPart.end(); ppp++) {
+            sp->addParticle(*ppp);// \todo do energy loss of new particles!!!
+
+        }
+
+        p = &(getSystemP()->getPartVectP()->at(id));  // p is now the new particle \todo should be done by the reaction???
+        DEB("Done acting.");  
+        DSV(fThickness-d); 
+    
+        de += fPMInt->do_de(this, fThickness-d,p)* p->getA(); // through remaining D2
+        strag += fPMInt->stragAng(this,fThickness - d,p,fStragAngScale);
+    
+        DSV(strag);
+        DSV(de);
+    
+        fEnergyLoss.push_back(de);
+        fStragAng.push_back(strag);
+
+    }// End No Foil
+
+
+/*
+
+    // _______________________ CASE 1, Reaction In Front Foil _______________________
+    if(d <= tfoil && tfoil >= 0){ cout << "CASE1" << endl;
+        DSV(d);
+        fTargetPos.push_back(d);  // save for histos/tuples
+        // energy loss and straggling before
+    
+        de = fPMInt->do_de_foil(this,d,p);
+        de *= p->getA(); 
+        DSV(de);
+    
+        strag = fPMInt->stragAng(this,d,p,fStragAngScale);  /// \todo here the end energy is used to calc the straggling.  OK???
+        DSV(strag);
+    
+        double r;   // random number for which reaction to choose
+        double ps;  // probability sum
+        r = fRngUniform->value(0,fTotReacProb);
+        ps=0;
+
+        vector<StReaction*>::const_iterator ireac;
+    
+        for (ireac = fReactions.begin(); ireac != fReactions.end(); ireac++) {
+            DEB("Considering reaction %s.",(*ireac)->getName().c_str());
+            ps += (*ireac)->getProb();
+            
+            if (r < ps) break;
+    
+        }
+    
+        DEB("Using reaction %s.",(*ireac)->getName().c_str());
+        DSV(r); DSV(ps);
+
+        if (r > ps) ERR("r > ps %f %f",r,ps);
+
+        size_t id = p->getID();  /// need to save id, in case act screws up the pointer \todo fix this!!!
+    
+        vector<StParticle> newPart;
+    
+        DEB("Doing reaction %s.",(*ireac)->getName().c_str());
+        (*ireac)->act(p, &newPart);
+    
+        // add new particles to the system
+        StSystem* sp;
+        sp = getSystemP(); 
+    
+        if (!sp) ERR("System pointer not set.");
+    
+        for (vector<StParticle>::const_iterator ppp = newPart.begin(); ppp != newPart.end(); ppp++) {
+            sp->addParticle(*ppp);// \todo do energy loss of new particles!!!
+    
+        }
+
+        p = &(getSystemP()->getPartVectP()->at(id));  // p is now the new particle \todo should be done by the reaction???
+        DEB("Done acting.");
+
+        // energy loss and straggling after
+        DSV(fThickness-d); 
+        de += fPMInt->do_de_foil(this, tfoil-d,p)* p->getA(); // from d to end of foil
+        strag +=fPMInt->stragAng(this,tfoil-d,p,fStragAngScale);
+    
+        de += fPMInt->do_de(this,bthick,p) * p->getA(); // from foil through D2
+        strag +=fPMInt->stragAng(this,bthick,p,fStragAngScale);
+    
+        de += fPMInt->do_de_foil(this,tfoil,p)*p->getA();
+        strag += fPMInt->stragAng(this,tfoil,p,fStragAngScale);
+    
+        DSV(strag);
+        DSV(de);
+    
+        fEnergyLoss.push_back(de);
+        fStragAng.push_back(strag);
+  
+    }// End Case 1
+
+    //__________________________ CASE 2 Reaction Happens In D2
+    else if(tfoil < d  && d <= bthick + tfoil && tfoil >= 0){ cout << "CASE2" << endl;
+        DSV(d);
+        fTargetPos.push_back(d);  // save for histos/tuples
+        // energy loss and straggling before
+        de = fPMInt->do_de_foil(this,tfoil,p); // propagate through the foil
+        strag = fPMInt->stragAng(this,tfoil,p,fStragAngScale); 
+    
+        de *= p->getA(); 
+        de += fPMInt->do_de(this,d-tfoil,p)*p->getA(); // propagate up to the reaction point  
+        DSV(de);
+    
+        strag += fPMInt->stragAng(this,d-tfoil,p,fStragAngScale);  /// \todo here the end energy is used to calc the straggling.  OK???
+        DSV(strag);
+
+        double r;   // random number for which reaction to choose
+        double ps;  // probability sum
+        r = fRngUniform->value(0,fTotReacProb);
+        ps=0;
+
+        vector<StReaction*>::const_iterator ireac;
+    
+        for (ireac = fReactions.begin(); ireac != fReactions.end(); ireac++) {
+            DEB("Considering reaction %s.",(*ireac)->getName().c_str());
+            ps += (*ireac)->getProb();    
+        
+            if (r < ps) break;
+        }
+    
+        DEB("Using reaction %s.",(*ireac)->getName().c_str());
+        DSV(r); DSV(ps);
+
+        if (r > ps) ERR("r > ps %f %f",r,ps);
+
+        size_t id = p->getID();  /// need to save id, in case act screws up the pointer \todo fix this!!!
+    
+        vector<StParticle> newPart;
+    
+        DEB("Doing reaction %s.",(*ireac)->getName().c_str());
+        (*ireac)->act(p, &newPart);
+    
+        // add new particles to the system
+        StSystem* sp;
+        sp = getSystemP(); 
+    
+        if (!sp) ERR("System pointer not set.");
+    
+        for (vector<StParticle>::const_iterator ppp = newPart.begin(); ppp != newPart.end(); ppp++) {
+            sp->addParticle(*ppp);// \todo do energy loss of new particles!!!
+
+        }
+
+        p = &(getSystemP()->getPartVectP()->at(id));  // p is now the new particle \todo should be done by the reaction???
+        DEB("Done acting.");  
+        DSV(fThickness-d); 
+    
+        de += fPMInt->do_de(this, bthick-(d-tfoil),p)* p->getA(); // through remaining D2
+        strag += fPMInt->stragAng(this,bthick-(d-tfoil),p,fStragAngScale);
+    
+        de += fPMInt->do_de_foil(this,tfoil,p)*p->getA(); // through foil again
+        strag += fPMInt->stragAng(this,tfoil,p,fStragAngScale);
+    
+        DSV(strag);
+        DSV(de);
+    
+        fEnergyLoss.push_back(de);
+        fStragAng.push_back(strag);
+
+    }// End Case 2
+
+    // ______________________ CASE 3, Reaction In Back Foil _________________________
+    else if(d >= bthick + tfoil && tfoil >= 0){ cout << "CASE3" << endl;
+        DSV(d);
+        fTargetPos.push_back(d);  // save for histos/tuples
+    
+        // energy loss and straggling before
+        de = fPMInt->do_de_foil(this,tfoil,p); // propagate through the foil
+        strag = fPMInt->stragAng(this,d,p,fStragAngScale); 
+    
+        //de = fPMInt->do_de(this,d,p);
+        de *= p->getA(); 
+        de += fPMInt->do_de(this,bthick,p) * p->getA(); // propagate through the D2
+    
+        strag += fPMInt->stragAng(this,bthick,p,fStragAngScale); 
+        de += fPMInt->do_de_foil(this,d-bthick-tfoil,p) * p->getA();// propagate through back foil
+    
+        strag += fPMInt->stragAng(this,tfoil-bthick-tfoil,p);  
+
+        DSV(de);
+        DSV(strag);
+
+    
+        double r;   // random number for which reaction to choose
+        double ps;  // probability sum
+        r = fRngUniform->value(0,fTotReacProb);
+        ps=0;
+
+        vector<StReaction*>::const_iterator ireac;
+    
+        for (ireac = fReactions.begin(); ireac != fReactions.end(); ireac++) {
+            DEB("Considering reaction %s.",(*ireac)->getName().c_str());
+            ps += (*ireac)->getProb();
+        
+            if (r < ps) break;
+        }
+
+        DEB("Using reaction %s.",(*ireac)->getName().c_str());
+        DSV(r); DSV(ps);
+
+        if (r > ps) ERR("r > ps %f %f",r,ps);
+
+        size_t id = p->getID();  /// need to save id, in case act screws up the pointer \todo fix this!!!
+    
+        vector<StParticle> newPart;
+    
+        DEB("Doing reaction %s.",(*ireac)->getName().c_str());
+        (*ireac)->act(p, &newPart);
+    
+        // add new particles to the system
+        StSystem* sp;
+        sp = getSystemP(); 
+    
+        if (!sp) ERR("System pointer not set.");
+        
+        for (vector<StParticle>::const_iterator ppp = newPart.begin(); ppp != newPart.end(); ppp++) {
+            sp->addParticle(*ppp);// \todo do energy loss of new particles!!!
+    
+        }
+    
+        p = &(getSystemP()->getPartVectP()->at(id));  // p is now the new particle \todo should be done by the reaction???
+        DEB("Done acting.");
+
+        // energy loss and straggling after
+        DSV(fThickness-d); 
+    
+        de += fPMInt->do_de_foil(this, fThickness-d,p)* p->getA(); // through remaining foil
+        strag += fPMInt->stragAng(this,fThickness-d,p,fStragAngScale);
+    
+        DSV(strag);
+        DSV(de);
+    
+        fEnergyLoss.push_back(de);
+        fStragAng.push_back(strag);
+
+
+    }// End Case 3
+ */ 
+    else{
+        cout << "d: " << d <<  " tfoil: " << tfoil << " bthick: " << bthick << " fThickness: " << fThickness << endl;
+        ERR("distance is outside target!"); 
+    }
+ 
+  } // yes reaction bracket
+  return 0;
+}
+
+
+
+int StMaterial::fillSpecialNtupFields(string n, int pn) {
+    string nn = n.substr(n.find("-")+1);
+  
+    if (nn == "dE") {
+        getSystemP()->getTupleP()->fillField(n, fEnergyLoss.at(pn));
+        return 0;
+  
+    }
+  
+    if (nn == "TP") {
+        getSystemP()->getTupleP()->fillField(n, fTargetPos.at(pn));
+        return 0;
+  
+    }
+  
+    if (nn.find("R_") != string::npos) {
+        string nnn=nn.substr(nn.find("R_")+2); //cout << "string: " << nnn << endl;
+        DSV(nn);
+        DSV(nnn);
+    
+        for (vector<StReaction*>::const_iterator reacI=fReactions.begin(); reacI != fReactions.end(); reacI++){
+            double v;
+      
+            if ( (*reacI)->savedValue(pn,nnn,&v)) return 1;
+	  
+            DSV(v);
+            getSystemP()->getTupleP()->fillField(n, v);
+      
+            return 0;
+        }
+    }
+  
+    return 1;
+}
+
+
+
+void StMaterial::addReaction(StReaction* r) {
+    if (fReactions.size() > 0) ERR("Only one reaction allowed currently");
+  
+    fReactions.push_back(r);
+    fTotReacProb += r->getProb();
+}
+
+

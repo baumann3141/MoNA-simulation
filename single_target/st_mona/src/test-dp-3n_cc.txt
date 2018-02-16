@@ -1,0 +1,160 @@
+//////////////////////// (d,p) reaction //////////////////////////////
+int StReacDP::act(StParticle* p, vector<StParticle>* newPart) {
+  /// check for all functions are initialized ///
+  if (!p) ERR("Particle pointer not set.");
+  if (!fRngUniform) ERR("Need uniform random number generator");
+  if (!fRngAngDist) ERR("Need angular distribution random number generator");
+  if (!fRngExEn) ERR("Need fRngExEn");
+  if (!newPart) ERR("Pointer newPart not set; Cannot add new particles");
+  
+  /// intialize all variables ///
+  double theta;			// angle theta
+  double cosTheta;		// cos(theta)
+  double phi;                 	// angle phi
+  double eN,eF;   		// total neutron and fragment energy
+  double pN,pF; 		// fragment and neutron momentum
+  double eCM;   		// total CM energy
+  double exen;  		// excitation energy
+  TLorentzVector beam;
+  TLorentzVector target;
+  TLorentzVector total;
+  TLorentzVector fragment;
+  TLorentzVector neutron;
+  TVector3 Boost_cm_dp;
+  TVector3 Boost_cm_neutron_evaporation;
+  
+  double beta=p->getBeta();        	// initial beta
+  p->setA(24.0);  //14                 	// remove protons and neutrons
+  p->setm(p->getA()*931.494028);        // set new mass
+  p->setZ(p->getZ());        		// set new Z
+  p->setQ(p->getZ());			// set new Q
+  p->setBeta(beta);			// set velocity
+  
+  // create the neutron, the particle p is already created
+  StParticle pp;   
+  pp.setA(1);
+  pp.setm(1.0*939.565346);
+  pp.setZ(0);
+  pp.setQ(0);
+  pp.setx(p->getx());     // same position
+  pp.sety(p->gety()); 
+  pp.setz(p->getz());     
+  pp.sett(p->gett());     // same time
+  pp.setEkin(0);
+  
+  // Setting up the tlorentz vectors for the beam/target
+  beam.SetPxPyPzE(p->getPx(), p->getPy(), p->getPz(), p->getEtotal());
+  target.SetPxPyPzE(0,0,0,2.0*931.494028);
+  total.SetPxPyPzE(beam.Px(),beam.Py(),beam.Pz(),beam.E() + target.E());
+  
+  // Boosting the target/beam into the Center of Mass frame
+  Boost_cm_dp = total.BoostVector();
+  beam.Boost(-Boost_cm_dp);
+  target.Boost(-Boost_cm_dp);
+  
+  eCM = beam.E()+target.E();  // total CM energy
+  
+  beam.SetPxPyPzE(0,0,0,25.0*931.494028);//15
+  target.SetPxPyPzE(0,0,0,1.0*931.494028);
+  
+  eF = gsl_pow_2(eCM) - gsl_pow_2(target.M()) + gsl_pow_2(beam.M());
+  eF = eF/(2.*eCM);                    // total energy of fragment
+  
+  pF = eF*eF - gsl_pow_2(beam.M());
+  pF = sqrt(pF);
+  
+  theta    = fRngAngDist->value(0,M_PI);       // cos(theta)
+  phi      = fRngUniform->value(0,2.*M_PI);  // phi
+  fThetaMap[0] = theta;
+  fPhiMap[0]   = phi;
+  
+  beam.SetPxPyPzE(0,0,pF,eF);
+  beam.SetTheta(theta); // Set fragment angle
+  beam.SetPhi(phi); // Set fragment phi angle
+  
+  // go to the lab
+  beam.Boost(Boost_cm_dp);
+  //cout << beta << " " << beam.Beta() << endl;
+
+  //*****************************************************************
+  //ANK: AT THIS POINT I NEED TO INCORPORATE A 3N DECAY INSTEAD OF 1N
+  //*****************************************************************
+
+  // start of neutron evaporation
+  Boost_cm_neutron_evaporation = beam.BoostVector(); //create the boost 
+  
+  exen = 0;
+  do {
+    exen = fRngExEn->value();
+    // printf("Here ########## fRngExEn %f",exen); // Test CRH
+  } while (exen < 0);
+  DSV(exen);
+  fExEnMap[0]=exen;
+  
+  eCM = pp.getm() + p->getm() + exen;  // total CM energy
+  eN = gsl_pow_2(eCM) + gsl_pow_2(pp.getm()) - gsl_pow_2(p->getm());
+  eN = eN/(2.*eCM);                    // total energy neutron
+  eF = gsl_pow_2(eCM) - gsl_pow_2(pp.getm()) + gsl_pow_2(p->getm());
+  eF = eF/(2.*eCM);                    // total energy of fragment
+  
+  /// \todo check is arg of sqrt is positive
+  pN = eN*eN - gsl_pow_2(pp.getm());
+  pN = sqrt(pN);
+  pF = eF*eF - gsl_pow_2(p->getm());
+  pF = sqrt(pF);
+  pF = -pF;  // fragment goes in opposite direction
+  
+  fragment.SetPxPyPzE(0,0,pF,eF);
+  neutron.SetPxPyPzE(0,0,pN,eN);
+  
+  // set theta and phi to some random value  
+  cosTheta = fRngUniform->value(-1,1);       // cos(theta)
+  theta    = acos(cosTheta);
+  phi      = fRngUniform->value(0,2.*M_PI);  // phi
+  
+  fragment.SetTheta(theta); // Set fragment angle
+  neutron.SetTheta(M_PI - theta); // Set neutron angle 180-theta
+  fragment.SetPhi(phi); // Set fragment phi angle
+  neutron.SetPhi(phi + M_PI); // set neutron phi angle
+  
+  // go to the lab
+  fragment.Boost(Boost_cm_neutron_evaporation);
+  neutron.Boost(Boost_cm_neutron_evaporation);
+  
+  // set fragment energy and direction
+  p->setEtotal(fragment.E()); /// \todo implement setLVec() to set particle data from 4-vector
+  p->setThetaPhi(fragment.Theta(),fragment.Phi()); 
+  
+  // set neutron energy and direction
+  pp.setEtotal(neutron.E());
+  pp.setThetaPhi(neutron.Theta(),neutron.Phi()); 
+
+  newPart->push_back(pp); 
+  
+  DSV(p->getA());
+  DSV(p->getZ());
+  
+  return 0;
+}
+
+int StReacDP::savedValue(size_t part_id, string name, double* v) {
+  DSV(part_id);
+  DSV(name);
+  if (name == "exen" &&  (fExEnMap.find(part_id) != fExEnMap.end()) ) {
+    *v = fExEnMap[part_id];
+    DSV(*v);
+    return 0;
+  }
+  if (name == "ph" &&  (fPhiMap.find(part_id) != fPhiMap.end()) ) {
+    *v = fPhiMap[part_id];
+    DSV(*v);
+    return 0;
+  }
+  if (name == "th" &&  (fThetaMap.find(part_id) != fThetaMap.end()) ) {
+    *v = fThetaMap[part_id];
+    DSV(*v);
+    return 0;
+  }
+  return 1;
+}
+// End (d,p)

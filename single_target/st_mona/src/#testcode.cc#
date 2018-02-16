@@ -1,0 +1,79 @@
+//////////////////////// (d,p) reaction //////////////////////////////
+int StReacDP::act(StParticle* p, vector<StParticle>* newPart) {
+  /// check for all functions are initialized ///
+  if (!p) ERR("Particle pointer not set.");
+  if (!fRngUniform) ERR("Need uniform random number generator");
+  if (!fRngAngDist) ERR("Need angular distribution random number generator");
+  if (!fRngExEn) ERR("Need fRngExEn");
+  if (!newPart) ERR("Pointer newPart not set; Cannot add new particles");
+  
+  /// intialize all variables ///
+  double theta;			// angle theta
+  double cosTheta;		// cos(theta)
+  double phi;                 	// angle phi
+  double eN,eF;   		// total neutron and fragment energy
+  double pN,pF; 		// fragment and neutron momentum
+  double eCM;   		// total CM energy
+  double exen;  		// excitation energy
+  TLorentzVector beam;
+  TLorentzVector target;
+  TLorentzVector total;
+  TLorentzVector fragment;
+  TLorentzVector neutron;
+  TVector3 Boost_cm_dp;
+  TVector3 Boost_cm_neutron_evaporation;
+  
+  double beta=p->getBeta();        	// initial beta
+  p->setA(14.0);  //14                 	// remove protons and neutrons
+  p->setm(p->getA()*931.494028);        // set new mass
+  p->setZ(p->getZ());        		// set new Z
+  p->setQ(p->getZ());			// set new Q
+  p->setBeta(beta);			// set velocity
+  
+  // create the neutron, the particle p is already created
+  StParticle pp;   
+  pp.setA(1);
+  pp.setm(1.0*939.565346);
+  pp.setZ(0);
+  pp.setQ(0);
+  pp.setx(p->getx());     // same position
+  pp.sety(p->gety()); 
+  pp.setz(p->getz());     
+  pp.sett(p->gett());     // same time
+  pp.setEkin(0);
+  
+  // Setting up the tlorentz vectors for the beam/target
+  beam.SetPxPyPzE(p->getPx(), p->getPy(), p->getPz(), p->getEtotal());
+  target.SetPxPyPzE(0,0,0,2.0*931.494028);
+  total.SetPxPyPzE(beam.Px(),beam.Py(),beam.Pz(),beam.E() + target.E());
+  
+  // Boosting the target/beam into the Center of Mass frame
+  Boost_cm_dp = total.BoostVector();
+  beam.Boost(-Boost_cm_dp);
+  target.Boost(-Boost_cm_dp);
+  
+  eCM = beam.E()+target.E();  // total CM energy
+  
+  beam.SetPxPyPzE(0,0,0,15.0*931.494028);//15
+  target.SetPxPyPzE(0,0,0,1.0*931.494028);
+  
+  eF = gsl_pow_2(eCM) - gsl_pow_2(target.M()) + gsl_pow_2(beam.M());
+  eF = eF/(2.*eCM);                    // total energy of fragment
+  
+  pF = eF*eF - gsl_pow_2(beam.M());
+  pF = sqrt(pF);
+  
+  theta    = fRngAngDist->value(0,M_PI);       // cos(theta)
+  phi      = fRngUniform->value(0,2.*M_PI);  // phi
+  fThetaMap[0] = theta;
+  fPhiMap[0]   = phi;
+  
+  beam.SetPxPyPzE(0,0,pF,eF);
+  beam.SetTheta(theta); // Set fragment angle
+  beam.SetPhi(phi); // Set fragment phi angle
+  
+  // go to the lab
+  beam.Boost(Boost_cm_dp);
+  //cout << beta << " " << beam.Beta() << endl;
+
+ // start of neutron evaporation

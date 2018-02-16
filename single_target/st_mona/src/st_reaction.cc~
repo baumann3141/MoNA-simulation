@@ -1,0 +1,1719 @@
+/** \file 
+    implementation of target stuff
+ */
+
+#include <gsl/gsl_math.h>
+
+#include "st_reaction.hh"
+#include "st_system.hh"
+
+/// \todo define own 4vector class and used that for now use ROOT 4Vector
+///       or copy 4 vector class from root
+#include <TLorentzVector.h>
+#include <TGenPhaseSpace.h>
+// FILE *opf1 = fopen("test.out","w");
+
+
+
+int StReacStripEvap::act(StParticle* p, vector<StParticle>* newPart) {
+  if (!p) ERR("Particle pointer not set.");
+
+  //For momentum distribution
+  TLorentzVector lvProj;
+  lvProj.SetPxPyPzE(p->getPx(), p->getPy(), p->getPz(), p->getEtotal());
+
+  // change particle, keep velocity the same  
+  //**zwk reduce beta after reaction following LISE++
+  double beta = p->getBeta() * fVelocityScale;        // initial beta
+  double A = p->getA();            // initial mass number
+  p->setA(p->getA() - fNn - fNp);  // remove protons and neutrons
+  p->setm(p->getA()*931.494028);        // set new mass
+  p->setZ(p->getZ() - fNp);        // set new Z
+  p->setQ(p->getZ());              // set new Q
+  p->setBeta(beta);                // set velocity
+
+  TLorentzVector tl;
+  tl.SetPxPyPzE(p->getPx(), p->getPy(), p->getPz(), p->getEtotal());
+  DSV(tl.Theta());
+  DSV(tl.Phi());
+  DSV(tl.E() - tl.M());
+
+  fPzMap[0]=-1;
+  if(fUseParaMom){
+    //---Parallel Mom. Distribution------
+    //Get boost vector of projectile
+    TVector3 vecProj = lvProj.BoostVector();
+    //Into proj frame
+    tl.Boost(-1*vecProj);
+    double Pz = fRngParaMom->value();
+    //cout << Pz << endl;
+    fPzMap[0] = Pz;
+    TVector3 fragP_frame (tl.Px(), tl.Py(), Pz);
+    tl.SetVectM(fragP_frame, p->getm());
+    //boost back to lab-frame
+    tl.Boost(vecProj);
+    //----------------------------
+  }
+  else{
+    // Glauber momentum kick 
+    double sig, sig0;
+    sig0 = 90;  // MeV/c
+    sig = p->getA() * abs( fNn + fNp ) / ( A - 1);
+    if (sig < 0) ERR("sig < 0; sig = %g", sig);
+    sig = fGlauberKickScale * sig0 * sqrt(sig);
+    DSV(sig);
+    
+    if (!fRngUniform)      ERR("Need uniform random number generator");
+    if (!fRngGaussGlauber) ERR("Need gauss random number generator");
+    
+    double cosTheta,theta,phi;                 // cos(theta), theta, phi
+    cosTheta = fRngUniform->value(-1,1);// cos(theta)
+    theta    = acos(cosTheta);
+    phi      = fRngUniform->value(0,2.*M_PI);  // phi
+    //theta = 0.0; // Inserted for test CRH 1/24/08
+    //phi = 0.0; // Inserted for test CRH 1/24/08
+    DSV(theta);
+    DSV(phi);
+    
+    fRngGaussGlauber->setCentroid(0);
+    fRngGaussGlauber->setSigma(sig);
+    
+    double glaubP = fRngGaussGlauber->value();
+    //-=-=-==--=-=-=-==
+    //idea to create tail in mom. distribution following LISE++, zwk
+    if(glaubP < 0) glaubP = glaubP * fAsymMomentum;
+    //--------------------
+
+    DSV(glaubP);
+    TVector3 vGlaubP(0,0,glaubP);
+    vGlaubP.SetTheta(theta);
+    vGlaubP.SetPhi(phi);
+
+    TVector3 vP;                  // total momentum
+    vP = tl.Vect() + vGlaubP;
+    tl.SetVectM(vP,p->getm());
+
+    fPzMap[0] = tl.Pz();
+  }
+
+  DSV(tl.Theta());
+  DSV(tl.Phi());
+  DSV(tl.E() - tl.M());
+
+  //debugging stuff
+  if (debugSwitch == "thetaLABP")
+	  cout << tl.Theta()<< endl;
+  //debugging stuff
+  if (debugSwitch == "phiLABP")
+	  cout << tl.Phi()<< endl;
+  TVector3 t3Boost;
+  t3Boost = tl.BoostVector();  // boost vector for 24O
+
+  // start of neutron evaporation
+  p->setA(p->getA() - 1);
+  p->setm(p->getA()*931.494028);
+  p->setEkin(0);               // 23O at rest
+
+  TLorentzVector tl1;  // particle 1 (heavy fragment)
+  tl1.SetPxPyPzE(p->getPx(), p->getPy(), p->getPz(), p->getEtotal());
+
+  // create neutron
+  StParticle pp;   
+  pp.setA(1);
+  pp.setm(pp.getA()*939.565346);
+  pp.setZ(0);
+  pp.setQ(0);
+  pp.setx(p->getx());     // same position
+  pp.sety(p->gety()); 
+  pp.setz(p->getz());     
+  pp.sett(p->gett());     // same time
+  pp.setEkin(0);
+  
+  TLorentzVector tl2;  // particle 2 (neutron)
+  tl2.SetPxPyPzE(pp.getPx(), pp.getPy(), pp.getPz(), pp.getEtotal());
+  
+  double eN, eF;   // total neutron and fragment energy
+  double eCM;   // total CM energy
+  double exen;  // excitation energy
+
+  exen = 0;
+  if (!fRngExEn) ERR("Need fRngExEn");
+  do {
+    exen = fRngExEn->value();
+    // printf("Here ########## fRngExEn %f",exen); // Test CRH
+  } while (exen < 0);
+  DSV(exen);
+  fExEnMap[0]=exen;
+
+  //debugging stuff
+  if (debugSwitch == "exen")
+	  cout << exen<< endl;
+  eCM = pp.getm() + p->getm() + exen;  // total CM energy
+  eN = gsl_pow_2(eCM) + gsl_pow_2(pp.getm()) - gsl_pow_2(p->getm());
+  eN = eN/(2.*eCM);                    // total energy neutron
+  eF = gsl_pow_2(eCM) - gsl_pow_2(pp.getm()) + gsl_pow_2(p->getm());
+  eF = eF/(2.*eCM);                    // total energy of fragment
+
+  /// \todo check is arg of sqrt is positive
+  double pN,pF; // fragment and neutron momentum
+  pN = eN*eN - gsl_pow_2(pp.getm());
+  pN = sqrt(pN);
+  pF = eF*eF - gsl_pow_2(p->getm());
+  pF = sqrt(pF);
+  pF = -pF;  // fragment goes in opposit direction
+
+  tl1.SetPxPyPzE(0,0,pF,eF);
+  tl2.SetPxPyPzE(0,0,pN,eN);
+  
+  // set theta and phi to some random value
+  if (!fRngUniform) ERR("Need random number generator");
+  
+  double cosTheta = fRngUniform->value(-1,1);       // cos(theta)
+  double theta    = acos(cosTheta);
+  //theta = 0.0; // Test CRH
+  double phi      = fRngUniform->value(0,2.*M_PI);  // phi
+  //phi = 0.0; // Test CRH
+  fThetaMap[0] = theta;
+  fPhiMap[0]   = phi;
+
+  tl1.SetTheta(theta); // Set fragment angle
+  tl2.SetTheta(M_PI - theta); // Set neutron angle 180-theta
+  tl1.SetPhi(phi); // Set fragment phi angle
+  tl2.SetPhi(phi + M_PI); // set neutron phi angle
+  
+  // go to the lab
+  tl1.Boost(t3Boost);
+  tl2.Boost(t3Boost);
+
+  // set fragment energy and direction
+  p->setEtotal(tl1.E()); /// \todo implement setLVec() to set particle data from 4-vector
+  p->setThetaPhi(tl1.Theta(),tl1.Phi()); 
+  
+  // set neutron energy and direction
+  pp.setEtotal(tl2.E());
+  pp.setThetaPhi(tl2.Theta(),tl2.Phi()); 
+
+  if(! newPart) ERR("Pointer newPart not set; Cannot add new particles");
+  newPart->push_back(pp); 
+
+  DSV(p->getA());
+  DSV(p->getZ());
+  return 0;
+}
+
+int StReacStripEvap::savedValue(size_t part_id, string name, double* v) {
+  DSV(part_id);
+  DSV(name);
+  if (name == "exen" &&  (fExEnMap.find(part_id) != fExEnMap.end()) ) {
+    *v = fExEnMap[part_id];
+    DSV(*v);
+    return 0;
+  }
+  if (name == "ph" &&  (fPhiMap.find(part_id) != fPhiMap.end()) ) {
+    *v = fPhiMap[part_id];
+    DSV(*v);
+    return 0;
+  }
+  if (name == "th" &&  (fThetaMap.find(part_id) != fThetaMap.end()) ) {
+    *v = fThetaMap[part_id];
+    DSV(*v);
+    return 0;
+  }
+  if (name == "pz" &&  (fPzMap.find(part_id) != fPzMap.end()) ) {
+    *v = fPzMap[part_id];
+    DSV(*v);
+    return 0;
+  }
+  return 1;
+}
+
+
+//--------------Stripping, Knockout Reactions Only, Glaub_noDecay--------------
+
+int StReacGlaub_noDecay::act(StParticle* p, vector<StParticle>* newPart) {
+  if (!p) ERR("Particle pointer not set.");
+
+  //For momentum distribution
+  TLorentzVector lvProj;
+  lvProj.SetPxPyPzE(p->getPx(), p->getPy(), p->getPz(), p->getEtotal());
+
+  // change particle, keep velocity the same  
+  //**zwk reduce beta after reaction following LISE++
+  double beta = p->getBeta() * fVelocityScale;        // initial beta
+  double A = p->getA();            // initial mass number
+  p->setA(p->getA() - fNn - fNp);  // remove protons and neutrons
+  p->setm(p->getA()*931.494028);        // set new mass
+  p->setZ(p->getZ() - fNp);        // set new Z
+  p->setQ(p->getZ());              // set new Q
+  p->setBeta(beta);                // set velocity
+
+  TLorentzVector tl;
+  tl.SetPxPyPzE(p->getPx(), p->getPy(), p->getPz(), p->getEtotal());
+  DSV(tl.Theta());
+  DSV(tl.Phi());
+  DSV(tl.E() - tl.M());
+
+  fPzMap[0]=-1;
+  if(fUseParaMom){
+    //---Parallel Mom. Distribution------
+    //Get boost vector of projectile
+    TVector3 vecProj = lvProj.BoostVector();
+    //Into proj frame
+    tl.Boost(-1*vecProj);
+    double Pz = fRngParaMom->value();
+    //cout << Pz << endl;
+    fPzMap[0] = Pz;
+    TVector3 fragP_frame (tl.Px(), tl.Py(), Pz);
+    tl.SetVectM(fragP_frame, p->getm());
+    //boost back to lab-frame
+    tl.Boost(vecProj);
+    //----------------------------
+  }
+  else{
+    // Glauber momentum kick 
+    double sig, sig0;
+    sig0 = 90;  // MeV/c
+    sig = p->getA() * abs( fNn + fNp ) / ( A - 1);
+    if (sig < 0) ERR("sig < 0; sig = %g", sig);
+    sig = fGlauberKickScale * sig0 * sqrt(sig);
+    DSV(sig);
+    
+    if (!fRngUniform)      ERR("Need uniform random number generator");
+    if (!fRngGaussGlauber) ERR("Need gauss random number generator");
+    
+    double cosTheta,theta,phi;                 // cos(theta), theta, phi
+    cosTheta = fRngUniform->value(-1,1);// cos(theta)
+    theta    = acos(cosTheta);
+    phi      = fRngUniform->value(0,2.*M_PI);  // phi
+    //theta = 0.0; // Inserted for test CRH 1/24/08
+    //phi = 0.0; // Inserted for test CRH 1/24/08
+    DSV(theta);
+    DSV(phi);
+    
+    fRngGaussGlauber->setCentroid(0);
+    fRngGaussGlauber->setSigma(sig);
+    
+    double glaubP = fRngGaussGlauber->value();
+    //-=-=-==--=-=-=-==
+    //idea to create tail in mom. distribution following LISE++, zwk
+    if(glaubP < 0) glaubP = glaubP * fAsymMomentum;
+    //--------------------
+
+    DSV(glaubP);
+    TVector3 vGlaubP(0,0,glaubP);
+    vGlaubP.SetTheta(theta);
+    vGlaubP.SetPhi(phi);
+
+    TVector3 vP;                  // total momentum
+    vP = tl.Vect() + vGlaubP;
+    tl.SetVectM(vP,p->getm());
+
+    fPzMap[0] = tl.Pz();
+  }
+
+  DSV(tl.Theta());
+  DSV(tl.Phi());
+  DSV(tl.E() - tl.M());
+
+  //debugging stuff
+  if (debugSwitch == "thetaLABP")
+	  cout << tl.Theta()<< endl;
+  //debugging stuff
+  if (debugSwitch == "phiLABP")
+    cout << tl.Phi()<< endl;
+ 
+  double exen = 0;
+  DSV(exen);
+  fExEnMap[0]=exen;
+
+  fThetaMap[0] = tl.Theta();
+  fPhiMap[0]   = tl.Phi();
+
+  // set fragment energy and direction
+  p->setEtotal(tl.E()); /// \todo implement setLVec() to set particle data from 4-vector
+  p->setThetaPhi(tl.Theta(),tl.Phi()); 
+  
+  //zwk, create a "fake" neutron for the code
+  StParticle pp;   
+  pp.setA(1);
+  pp.setm(pp.getA()*939.565346);
+  pp.setZ(0);
+  pp.setQ(0);
+  pp.setx(p->getx());     // same position
+  pp.sety(p->gety()); 
+  pp.setz(p->getz());     
+  pp.sett(p->gett());     // same time
+  pp.setEkin(0);
+  if(! newPart) ERR("Pointer newPart not set; Cannot add new particles");
+  newPart->push_back(pp); 
+
+  DSV(p->getA());
+  DSV(p->getZ());
+  return 0;
+}
+
+int StReacGlaub_noDecay::savedValue(size_t part_id, string name, double* v) {
+  DSV(part_id);
+  DSV(name);
+  if (name == "exen" &&  (fExEnMap.find(part_id) != fExEnMap.end()) ) {
+    *v = fExEnMap[part_id];
+    DSV(*v);
+    return 0;
+  }
+  if (name == "ph" &&  (fPhiMap.find(part_id) != fPhiMap.end()) ) {
+    *v = fPhiMap[part_id];
+    DSV(*v);
+    return 0;
+  }
+  if (name == "th" &&  (fThetaMap.find(part_id) != fThetaMap.end()) ) {
+    *v = fThetaMap[part_id];
+    DSV(*v);
+    return 0;
+  }
+  if (name == "pz" &&  (fPzMap.find(part_id) != fPzMap.end()) ) {
+    *v = fPzMap[part_id];
+    DSV(*v);
+    return 0;
+  }
+  return 1;
+}
+
+
+//---------------------2 Neutron Sequential Decay-------------------------//
+int StReacStripEvap2neutron::act(StParticle* p, vector<StParticle>* newPart) {
+
+  //Setting up the two decay energies
+  double exen     = 0; //Total Decay Energy
+  double exen1    = 0; //1st Decay Energy
+  double exen2    = 0; //2nd Decay Energy
+  //Create Varibles to give give directions to particles and Glauber Kick
+  double cosTheta;     //Used to set the cos(Theta)
+  double theta;        //Used to set the Theta
+  double phi;          //Used to set the Phi
+
+  // cout << "Check velocity, asymMom: " << fVelocityScale << ", " << fAsymMomentum << endl;
+
+  //for volya 2n
+  double erel = 0; //rel energy between 2 neutrons
+
+  //Check that all necassery random number generators are found
+  if (!fRngExEn)           ERR("Need fRngExEn");
+  if (!fRngExEn1)          ERR("Need fRngExEn1");
+  if (!fRngExEn2)          ERR("Need fRngExEn2");
+  if (!fRngUniform)        ERR("Need uniform random number generator");
+  if (!fRngGaussGlauber)   ERR("Need gauss random number generator");
+
+  //Determine the first and second decay energies
+  if (fWhichEnergyDoIReconstruct == "volya2n"){
+
+    //for volya + bw
+    fRngExEn->value2d(exen,erel);
+
+    exen1 = 0.5 * (exen + erel);
+    exen2 = 0.5 * (exen - erel);
+
+    //printf("Inside StReactStripEvap2neutron, Volya2n: exen:%f erel:%f  exen1:%f  exen2:%f\n",exen,erel,exen1,exen2);
+    //printf("%f\n",erel);
+
+    DSV(exen1);
+    DSV(exen2);
+    fExEnMap[0]=exen1;
+    fExEnMap2[0]=exen2;
+  }
+  else if (fWhichEnergyDoIReconstruct == "TwoNeutron_seq")
+    {
+	  do {
+	    exen2 = fRngExEn2->value();
+	  } while (exen2 < 0);
+	  do {
+	    do {
+	      exen = fRngExEn->value(0,exen2);    
+	    } while (exen < 0);
+	    exen1 = exen-exen2;
+	  } while (exen1 < 0);
+	  DSV(exen1);
+	  DSV(exen2);
+	  fExEnMap[0]=exen1;
+	  fExEnMap2[0]=exen2;
+   	} else if (fWhichEnergyDoIReconstruct == "cos_1st")
+    {
+      do {
+	exen = fRngExEn->value();
+      } while (exen < 0);
+      do {
+	do {
+	  exen2 = exen*fRngExEn2->value();
+	} while (exen2 < 0);
+      		exen1 = exen-exen2;
+  	} while (exen1 < 0);
+      	DSV(exen1);
+      	DSV(exen2);
+      	fExEnMap[0]=exen1;
+      	fExEnMap2[0]=exen2;
+   	} else if (fWhichEnergyDoIReconstruct == "cos_2nd")
+   	{
+	do {
+      		exen = fRngExEn->value();
+  	} while (exen < 0);
+	do {
+		do {
+	      		exen1 = exen*fRngExEn1->value();
+  		} while (exen1 < 0);
+      		exen2 = exen-exen1;
+  	} while (exen2 < 0);
+      	DSV(exen1);
+      	DSV(exen2);
+      	fExEnMap[0]=exen1;
+      	fExEnMap2[0]=exen2;
+   	} else if (fWhichEnergyDoIReconstruct == "Reconstruct1stEnergy")
+   	{
+	do {
+      		exen = fRngExEn->value();
+  	} while (exen < 0);
+	do {
+		do {
+	      		exen2 = fRngExEn2->value();
+  		} while (exen2 < 0);
+      		exen1 = exen-exen2;
+		//printf("exen:%f exen1:%f exen2:%f\n",exen,exen1,exen2);
+  	} while (exen1 < 0);
+      	DSV(exen1);
+      	DSV(exen2);
+      	fExEnMap[0]=exen1;
+      	fExEnMap2[0]=exen2;
+   	} else if (fWhichEnergyDoIReconstruct == "Reconstruct2ndEnergy")
+      	{
+	do {
+		exen = fRngExEn->value();
+  	} while (exen < 0);
+	do {
+		do {
+		  exen1 = fRngExEn1->value();
+  		} while (exen1 < 0);
+		exen2 = exen-exen1;
+  	} while (exen2 < 0);
+	DSV(exen1);
+	DSV(exen2);
+	fExEnMap[0]=exen1;
+	fExEnMap2[0]=exen2;   
+   	} else {
+	do {
+		exen1 = fRngExEn1->value();
+  	} while (exen1 < 0);
+	do {
+		exen2 = fRngExEn2->value();
+  	} while (exen2 < 0);
+	DSV(exen1);
+	DSV(exen2);
+	fExEnMap[0]=exen1;
+	fExEnMap2[0]=exen2;    
+      }
+
+  //Temp added for looknig at efficiency - zwk
+  //exen1 = 0.5 * exen;
+  //exen2 = exen - exen1;
+  //fExEnMap[0] = exen1;
+  //fExEnMap2[0] = exen2;
+  //cout << exen << " " << exen1 << " " << exen2 << endl;
+
+
+  //debugging stuff -> Decay Energies
+  if (debugSwitch == "exen1")
+	  cout << exen1<< endl;
+  if (debugSwitch == "exen2")
+	  cout << exen2<< endl;
+
+  if (!p) ERR("Particle pointer not set.");
+
+  // change particle, keep velocity the same
+  //**zwk reduce beta after reaction following LISE++
+  double beta = p->getBeta() * fVelocityScale;        // initial beta
+  double A = p->getA();            // initial mass number
+  p->setA(p->getA() - fNn - fNp);  // remove protons and neutrons
+  p->setm(p->getA()*931.494028);        // set new mass
+  p->setZ(p->getZ() - fNp);        // set new Z
+  p->setQ(p->getZ());              // set new Q
+  p->setBeta(beta);                // set velocity
+
+  TLorentzVector tl;
+  tl.SetPxPyPzE(p->getPx(), p->getPy(), p->getPz(), p->getEtotal());
+  DSV(tl.Theta());
+  DSV(tl.Phi());
+  DSV(tl.E() - tl.M());
+
+  fPzMap[0]=-1;
+  // Glauber momentum kick 
+  double sig, sig0;
+  sig0 = 90;  // MeV/c
+  sig = p->getA() * ( fNn + fNp ) / ( A - 1);
+  if (sig < 0) ERR("sig < 0; sig = %g", sig);
+  sig = fGlauberKickScale * sig0 * sqrt(sig);
+  DSV(sig);
+  
+  cosTheta = fRngUniform->value(-1,1);// cos(theta)
+  theta    = acos(cosTheta);
+  phi      = fRngUniform->value(0,2.*M_PI);  // phi
+  DSV(theta);
+  DSV(phi);
+
+  fRngGaussGlauber->setCentroid(0);
+  fRngGaussGlauber->setSigma(sig);
+
+  double glaubP = fRngGaussGlauber->value();
+
+  //-=-=-==--=-=-=-==
+  //idea to create tail in mom. distribution following LISE++, zwk
+  if(glaubP < 0) glaubP = glaubP * fAsymMomentum;
+  //--------------------
+
+  DSV(glaubP);
+  TVector3 vGlaubP(0,0,glaubP);
+  vGlaubP.SetTheta(theta);
+  vGlaubP.SetPhi(phi);
+  
+  TVector3 vP;                  // total momentum
+  vP = tl.Vect() + vGlaubP;
+  tl.SetVectM(vP,p->getm());
+
+/*
+  //test changing angular distribution for 14Be(2+)->12Be+n+n, zwk
+  double theta_new = 0;
+  while(1){
+    fRngGaussGlauber->setCentroid(1.2);
+    fRngGaussGlauber->setSigma(1.0);
+    double theta_new_temp = fRngGaussGlauber->value() * TMath::DegToRad();
+    theta_new = theta_new_temp;
+    if(theta_new>0) break;
+  }
+  tl.SetTheta(theta_new);
+  //------
+*/
+
+
+  DSV(tl.Theta());
+  DSV(tl.Phi());
+  DSV(tl.E() - tl.M());
+
+
+  //debugging stuff
+  if (debugSwitch == "thetaLABP")
+	  cout << tl.Theta()<< endl;
+  if (debugSwitch == "phiLABP")
+	  cout << tl.Phi()<< endl;
+
+  TVector3 t3Boost;
+  t3Boost = tl.BoostVector();  // boost vector 
+
+  // start of neutron evaporation
+  p->setA(p->getA() - 1);
+  p->setm(p->getA()*931.494028);
+  p->setEkin(0);             
+
+  TLorentzVector tl1;  // particle 1 (heavy fragment)
+  tl1.SetPxPyPzE(p->getPx(), p->getPy(), p->getPz(), p->getEtotal());
+
+  // create neutron
+  StParticle pp;   
+  pp.setA(1);
+  pp.setm(pp.getA()*939.565346);
+  pp.setZ(0);
+  pp.setQ(0);
+  pp.setx(p->getx());     // same position
+  pp.sety(p->gety()); 
+  pp.setz(p->getz());     
+  pp.sett(p->gett());     // same time
+  pp.setEkin(0);
+  
+  TLorentzVector tl2;  // particle 2 (neutron)
+  tl2.SetPxPyPzE(pp.getPx(), pp.getPy(), pp.getPz(), pp.getEtotal());
+  
+  double eN, eF;   // total neutron and fragment energy
+  double eCM;   // total CM energy
+
+  eCM = pp.getm() + p->getm() + exen1;  // total CM energy
+  eN = gsl_pow_2(eCM) + gsl_pow_2(pp.getm()) - gsl_pow_2(p->getm());
+  eN = eN/(2.*eCM);                    // total energy neutron
+  eF = gsl_pow_2(eCM) - gsl_pow_2(pp.getm()) + gsl_pow_2(p->getm());
+  eF = eF/(2.*eCM);                    // total energy of fragment
+
+  /// \todo check is arg of sqrt is positive
+  double pN,pF; // fragment and neutron momentum
+  pN = eN*eN - gsl_pow_2(pp.getm());
+  pN = sqrt(pN);
+  pF = eF*eF - gsl_pow_2(p->getm());
+  if (pF < 0)
+    pF = 0;
+  else 
+    pF = sqrt(pF);
+  pF = -pF;  // fragment goes in opposit direction
+
+  tl1.SetPxPyPzE(0,0,pF,eF);
+  tl2.SetPxPyPzE(0,0,pN,eN);
+  
+  // set theta and phi for the first decay to some random value
+  cosTheta = fRngUniform->value(-1,1);       // cos(theta)
+  theta    = acos(cosTheta);
+  phi      = fRngUniform->value(0,2.*M_PI);  // phi
+  fThetaMap[0] = theta;
+  fPhiMap[0]   = phi;
+
+  tl1.SetTheta(theta); // Set fragment angle
+  tl1.SetPhi(phi); // Set fragment phi angle
+  tl2.SetTheta(M_PI - theta); // Set neutron angle 180-theta
+  tl2.SetPhi(phi + M_PI); // set neutron phi angle
+
+  TVector3 t4Boost;
+  t4Boost = tl1.BoostVector();  // boost vector for 24O
+
+  // start of the second neutron evaporation
+  p->setA(p->getA()-1);
+  p->setm(p->getA()*931.494028);
+  p->setEkin(0);               // 23O at rest
+
+
+  // create second neutron
+  StParticle ppp;   
+  ppp.setA(1);
+  ppp.setm(pp.getA()*939.565346);
+  ppp.setZ(0);
+  ppp.setQ(0);
+  ppp.setx(p->getx());     // same position
+  ppp.sety(p->gety()); 
+  ppp.setz(p->getz());     
+  ppp.sett(p->gett());     // same time
+  ppp.setEkin(0);
+  
+  TLorentzVector tl3;  // particle 3 (neutron)
+  tl3.SetPxPyPzE(ppp.getPx(), ppp.getPy(), ppp.getPz(), ppp.getEtotal());
+
+  double eN2, eF2;   // total neutron and fragment energy
+  double eCM2;       // total CM energy
+
+  eCM2 = ppp.getm() + p->getm() + exen2;  // total CM energy
+  eN2 = gsl_pow_2(eCM2) + gsl_pow_2(ppp.getm()) - gsl_pow_2(p->getm());
+  eN2 = eN2/(2.*eCM2);                    // total energy neutron
+  eF2 = gsl_pow_2(eCM2) - gsl_pow_2(ppp.getm()) + gsl_pow_2(p->getm());
+  eF2 = eF2/(2.*eCM2);                    // total energy of fragment
+
+  /// \todo check is arg of sqrt is positive
+  double pN2, pF2; // fragment and neutron momentum
+  pN2 = eN2*eN2 - gsl_pow_2(ppp.getm());
+  pN2 = sqrt(pN2);
+  pF2 = eF2*eF2 - gsl_pow_2(p->getm());
+  if (pF2 < 0)
+    pF2 = 0;
+  else 
+    pF2 = sqrt(pF2);
+  pF2 = -pF2;  // fragment goes in opposit direction
+
+  tl1.SetPxPyPzE(0,0,pF2,eF2);
+  tl3.SetPxPyPzE(0,0,pN2,eN2);
+  
+  // set theta and phi to some random value
+  cosTheta = fRngUniform->value(-1,1);       // cos(theta)
+  theta    = acos(cosTheta);
+  phi      = fRngUniform->value(0,2.*M_PI);  // phi
+  fThetaMap2[0] = theta;
+  fPhiMap2[0]   = phi;
+  tl1.SetTheta(theta);        // Set fragment angle
+  tl1.SetPhi(phi);            // Set fragment phi angle
+  tl3.SetTheta(M_PI - theta); // Set neutron angle 180-theta
+  tl3.SetPhi(phi + M_PI);     // Set neutron phi angle
+
+
+  /*
+  //===================================
+  //Attempt to do L=1 angular distribution-----
+  Double_t rann = fRngUniform->value(-1,1);
+  Int_t negRan = 1;
+  if(rann<0) negRan = -1;
+  Double_t cos_legendre_angle;
+  cos_legendre_angle = TMath::Power(rann,2.0);
+  Double_t legendre_angle = negRan * TMath::ACos(cos_legendre_angle);
+
+  Double_t theta_n1 = tl2.Theta();
+  Double_t theta_n2 = tl3.Theta();
+  Double_t phi_n1 = tl2.Phi();
+  Double_t phi_n2 = tl3.Phi();
+  Double_t new_theta = theta_n1 + legendre_angle;
+  tl3.SetPhi(phi_n1);
+  tl3.SetTheta(new_theta);
+  //printf("\n\nleg_angle: %f  thetan1: %f thetan2: %f  phin1:%f phin2:%f  tl3Theta:%f  tl3Phi:%f new_theta:%f\n",legendre_angle,theta_n1,theta_n2,phi_n1,phi_n2,tl3.Theta(),tl3.Phi(),new_theta);
+  //Set fragment theta so still back-to-back decay
+  tl1.SetTheta( tl3.Theta() + M_PI);
+  tl1.SetPhi( tl3.Phi() - M_PI);
+  //cout << tl2.Angle(tl3.Vect()) << endl;
+  //======================================
+  */
+
+  //Boosting into the frame where the fragment is at rest after the first decay
+  tl1.Boost(t4Boost);
+  tl3.Boost(t4Boost);
+
+  //Boosting all three particles to the lab frame
+  tl1.Boost(t3Boost);
+  tl2.Boost(t3Boost);
+  tl3.Boost(t3Boost);
+
+  // set fragment energy and direction
+  p->setEtotal(tl1.E()); /// \todo implement setLVec() to set particle data from 4-vector
+  p->setThetaPhi(tl1.Theta(),tl1.Phi()); 
+  
+  // set neutron energy and direction
+  pp.setEtotal(tl2.E());
+  pp.setThetaPhi(tl2.Theta(),tl2.Phi()); 
+
+  if(! newPart) ERR("Pointer newPart not set; Cannot add new particles");
+  newPart->push_back(pp); 
+
+  // set second neutron energy and direction
+  ppp.setEtotal(tl3.E());
+  ppp.setThetaPhi(tl3.Theta(),tl3.Phi());
+
+  if(! newPart) ERR("Pointer newPart not set; Cannot add new particles");
+  newPart->push_back(ppp); 
+
+  DSV(p->getA());
+  DSV(p->getZ());
+  return 0;
+}
+
+int StReacStripEvap2neutron::savedValue(size_t part_id, string name, double* v) {
+  DSV(part_id);
+  DSV(name);
+  if (name == "exen" &&  (fExEnMap.find(part_id) != fExEnMap.end()) ) {
+    *v = fExEnMap[part_id];
+    DSV(*v);
+    return 0;
+  }
+  if (name == "exen2" &&  (fExEnMap2.find(part_id) != fExEnMap2.end()) ) {
+    *v = fExEnMap2[part_id];
+    DSV(*v);
+    return 0;
+  }
+  if (name == "ph" &&  (fPhiMap.find(part_id) != fPhiMap.end()) ) {
+    *v = fPhiMap[part_id];
+    DSV(*v);
+    return 0;
+  }
+  if (name == "ph2" &&  (fPhiMap2.find(part_id) != fPhiMap2.end()) ) {
+    *v = fPhiMap2[part_id];
+    DSV(*v);
+    return 0;
+  }
+  if (name == "th" &&  (fThetaMap.find(part_id) != fThetaMap.end()) ) {
+    *v = fThetaMap[part_id];
+    DSV(*v);
+    return 0;
+  }
+  if (name == "th2" &&  (fThetaMap2.find(part_id) != fThetaMap2.end()) ) {
+    *v = fThetaMap2[part_id];
+    DSV(*v);
+    return 0;
+  }
+  if (name == "pz" &&  (fPzMap.find(part_id) != fPzMap.end()) ) {
+    *v = fPzMap[part_id];
+    DSV(*v);
+    return 0;
+  }
+  return 1;
+}
+
+////////////////////////////2n sequential//////////////////////////////////////
+
+//---------------------di-neutron decay-------------------------//
+int StReacStripEvap_dineutron::act(StParticle* p, vector<StParticle>* newPart) {
+
+  //Setting up the two decay energies
+  double exen     = 0; //Total Decay Energy
+  double exen1    = 0; //1st Decay Energy
+  double exen2    = 0; //2nd Decay Energy
+  //Create Varibles to give give directions to particles and Glauber Kick
+  double cosTheta;     //Used to set the cos(Theta)
+  double theta;        //Used to set the Theta
+  double phi;          //Used to set the Phi
+
+  double di_ei=0, di_ek=0;  //for Volya dineutron, intrinsic and kinetic energy of the dineutron
+
+  //Check that all necassery random number generators are found
+  if (!fRngExEn)           ERR("Need fRngExEn");
+  if (!fRngExEn1)          ERR("Need fRngExEn1");
+  if (!fRngExEn2)          ERR("Need fRngExEn2");
+  if (!fRngUniform)        ERR("Need uniform random number generator");
+  if (!fRngGaussGlauber)   ERR("Need gauss random number generator");
+
+  //Removed the fWhichEnergyDoIReconstruct stuff (not for di-neutron decay description)
+
+  //debugging stuff -> Decay Energies
+  if (debugSwitch == "exen1")
+	  cout << exen1<< endl;
+  if (debugSwitch == "exen2")
+	  cout << exen2<< endl;
+
+  if (!p) ERR("Particle pointer not set.");
+
+  
+  double exenTotal = -1;
+  double exenDiNeutron = -1;
+  //Volya's dineutron description
+  if(fWhichEnergyDoIReconstruct=="volyadineutron"){
+
+    //for volya + bw
+    fRngExEn->value2d(di_ei,di_ek);
+    
+    exenTotal = di_ei + di_ek;
+    exenDiNeutron = di_ei;
+  }
+  else{
+    
+    //Break-up Energy of the fragment+n2 system taken from input of -e 
+    while(1){
+      exenTotal = fRngExEn->value(); //MeV
+      if(exenTotal>0) break;
+    }
+    //Break-up Energy of the di-neutron taken from input of -e1 
+    while(1){
+      exenDiNeutron = fRngExEn1->value(); //MeV
+      //exenTotal = exenDiNeutron + exenTotal;
+      //exenDiNeutron = exenTotal * 0.5;
+      if(exenDiNeutron>0 && exenDiNeutron<exenTotal) break;
+    }
+  }
+  
+  //cout << exenTotal << "  " << exenDiNeutron << endl;
+
+  DSV(exenTotal);
+  DSV(exenDiNeutron);
+  fExEnMap[0]=exenTotal;
+  fExEnMap2[0]=exenDiNeutron;
+
+  // change particle, keep velocity the same
+  //**zwk reduce beta after reaction following LISE++
+  double beta = p->getBeta() * fVelocityScale;        // initial beta
+  double A = p->getA();            // initial mass number
+  p->setA(p->getA() - fNn - fNp);  // remove protons and neutrons
+  p->setm(p->getA()*931.494028);        // set new mass
+  p->setZ(p->getZ() - fNp);        // set new Z
+  p->setQ(p->getZ());              // set new Q
+  p->setBeta(beta);                // set velocity
+
+  TLorentzVector tl;
+  tl.SetPxPyPzE(p->getPx(), p->getPy(), p->getPz(), p->getEtotal());
+  DSV(tl.Theta());
+  DSV(tl.Phi());
+  DSV(tl.E() - tl.M());
+
+  fPzMap[0]=-1;
+  // Glauber momentum kick 
+  double sig, sig0;
+  sig0 = 90;  // MeV/c
+  sig = p->getA() * ( fNn + fNp ) / ( A - 1);
+  if (sig < 0) ERR("sig < 0; sig = %g", sig);
+  sig = fGlauberKickScale * sig0 * sqrt(sig);
+  DSV(sig);
+  
+  cosTheta = fRngUniform->value(-1,1);// cos(theta)
+  theta    = acos(cosTheta);
+  phi      = fRngUniform->value(0,2.*M_PI);  // phi
+  DSV(theta);
+  DSV(phi);
+
+  fRngGaussGlauber->setCentroid(0);
+  fRngGaussGlauber->setSigma(sig);
+
+  double glaubP = fRngGaussGlauber->value();
+  //-=-=-==--=-=-=-==
+  //idea to create tail in mom. distribution following LISE++, zwk
+  if(glaubP < 0) glaubP = glaubP * fAsymMomentum;
+  //--------------------
+
+  DSV(glaubP);
+  TVector3 vGlaubP(0,0,glaubP);
+  vGlaubP.SetTheta(theta);
+  vGlaubP.SetPhi(phi);
+  
+  TVector3 vP;                  // total momentum
+  vP = tl.Vect() + vGlaubP;
+  tl.SetVectM(vP,p->getm());
+  DSV(tl.Theta());
+  DSV(tl.Phi());
+  DSV(tl.E() - tl.M());
+
+  //debugging stuff
+  if (debugSwitch == "thetaLABP")
+	  cout << tl.Theta()<< endl;
+  if (debugSwitch == "phiLABP")
+	  cout << tl.Phi()<< endl;
+
+  TVector3 t3Boost;
+  t3Boost = tl.BoostVector();  // boost vector 
+
+  // start of di-neutron evaporation
+  p->setA(p->getA() - 2);
+  p->setm(p->getA()*931.494028);
+  p->setEkin(0);             
+
+  TLorentzVector tl1;  // particle 1 (heavy fragment)
+  tl1.SetPxPyPzE(p->getPx(), p->getPy(), p->getPz(), p->getEtotal());
+
+  // create di-neutron
+  StParticle pp;   
+  pp.setA(2);
+  pp.setm(pp.getA()*939.565346);
+  pp.setZ(0);
+  pp.setQ(0);
+  pp.setx(p->getx());     // same position
+  pp.sety(p->gety()); 
+  pp.setz(p->getz());     
+  pp.sett(p->gett());     // same time
+  pp.setEkin(0);
+  
+  TLorentzVector tl2;  // particle 2 (di-neutron)
+  tl2.SetPxPyPzE(pp.getPx(), pp.getPy(), pp.getPz(), pp.getEtotal());
+  
+  double e2N, eF;   // total neutron and fragment energy
+  double eCM;   // total CM energy
+
+  //Make sure don't have negative decay energies.
+  //Need to develop how we choose dineutron and frag-2n energies.
+  double exen12_left = exenTotal - exenDiNeutron;
+  if(exen12_left < 0){
+    cerr << "ExEn Left is less than ZERO!!" << endl;
+  }
+
+  eCM = pp.getm() + p->getm() + (exen12_left);  // total CM energy
+  e2N = gsl_pow_2(eCM) + gsl_pow_2(pp.getm()) - gsl_pow_2(p->getm());
+  e2N = e2N/(2.*eCM);                    // total energy neutron
+  eF = gsl_pow_2(eCM) - gsl_pow_2(pp.getm()) + gsl_pow_2(p->getm());
+  eF = eF/(2.*eCM);                    // total energy of fragment
+
+  /// \todo check is arg of sqrt is positive
+  double p2N,pF; // fragment and neutron momentum
+  p2N = e2N*e2N - gsl_pow_2(pp.getm());
+  p2N = sqrt(p2N);
+  pF = eF*eF - gsl_pow_2(p->getm());
+  if (pF < 0)
+    pF = 0;
+  else 
+    pF = sqrt(pF);
+  pF = -pF;  // fragment goes in opposit direction
+
+  tl1.SetPxPyPzE(0,0,pF,eF);
+  tl2.SetPxPyPzE(0,0,p2N,e2N);
+  
+  // set theta and phi for the first decay to some random value
+  cosTheta = fRngUniform->value(-1,1);       // cos(theta)
+  theta    = acos(cosTheta);
+  phi      = fRngUniform->value(0,2.*M_PI);  // phi
+  fThetaMap[0] = theta;
+  fPhiMap[0]   = phi;  
+  fThetaMap2[0] = theta;
+  fPhiMap2[0]   = phi;
+
+  tl1.SetTheta(theta); // Set fragment angle
+  tl1.SetPhi(phi); // Set fragment phi angle
+  tl2.SetTheta(M_PI - theta); // Set di-neutron angle 180-theta
+  tl2.SetPhi(phi + M_PI); // set di-neutron phi angle
+
+  TVector3 t4Boost;
+  t4Boost = tl2.BoostVector();  // boost vector for di-neutron
+
+  // start of the di-neutron decay
+  pp.setA(pp.getA()-1);
+  pp.setm(939.565346);
+  pp.setEkin(0);               // 23O at rest
+
+
+  // create second neutron
+  StParticle ppp;   
+  ppp.setA(1);
+  ppp.setm(pp.getA()*939.565346);
+  ppp.setZ(0);
+  ppp.setQ(0);
+  ppp.setx(pp.getx());     // same position
+  ppp.sety(pp.gety()); 
+  ppp.setz(pp.getz());     
+  ppp.sett(pp.gett());     // same time
+  ppp.setEkin(0);
+  
+  TLorentzVector tl3;  // particle 3 (neutron)
+  tl3.SetPxPyPzE(ppp.getPx(), ppp.getPy(), ppp.getPz(), ppp.getEtotal());
+
+  double eN_1, eN_2;   // total neutron and fragment energy
+  double eCM2;       // total CM energy
+
+  eCM2 = ppp.getm() + pp.getm() + exenDiNeutron;  // total CM energy
+  eN_2 = gsl_pow_2(eCM2) + gsl_pow_2(ppp.getm()) - gsl_pow_2(pp.getm());
+  eN_2 = eN_2/(2.*eCM2);                    // total energy neutron
+  eN_1 = gsl_pow_2(eCM2) - gsl_pow_2(ppp.getm()) + gsl_pow_2(pp.getm());
+  eN_1 = eN_1/(2.*eCM2);                    // total energy of fragment
+
+
+  /// \todo check is arg of sqrt is positive
+  double pN_2, pN_1; // fragment and neutron momentum
+  pN_2 = eN_2*eN_2 - gsl_pow_2(ppp.getm());
+  pN_2 = sqrt(pN_2);
+  pN_1 = eN_1*eN_1 - gsl_pow_2(pp.getm());
+  if (pN_1 < 0)
+    pN_1 = 0;
+  else 
+    pN_1 = sqrt(pN_1);
+  pN_1 = -pN_1;  // fragment goes in opposit direction
+
+  tl2.SetPxPyPzE(0,0,pN_1,eN_1);
+  tl3.SetPxPyPzE(0,0,pN_2,eN_2);
+  
+  // set theta and phi to some random value
+  cosTheta = fRngUniform->value(-1,1);       // cos(theta)
+  theta    = acos(cosTheta);
+  phi      = fRngUniform->value(0,2.*M_PI);  // phi
+  //fThetaMap2[0] = theta;
+  //fPhiMap2[0]   = phi;
+  tl2.SetTheta(theta);        // Set neutron1 angle
+  tl2.SetPhi(phi);            // Set neutron1 phi angle
+  tl3.SetTheta(M_PI - theta); // Set neutron2 angle 180-theta
+  tl3.SetPhi(phi + M_PI);     // Set neutron2 phi angle
+
+  //Boosting into the frame where the fragment is at rest after the first decay
+  tl2.Boost(t4Boost);
+  tl3.Boost(t4Boost);
+
+
+  /*
+  //-------
+  //Calculating angles, energy for output of the original nn correlations for PRL comment reply
+  TLorentzVector lv_F = tl1;
+  TLorentzVector lv_N1 = tl2;
+  TLorentzVector lv_N2 = tl3;
+
+  TLorentzVector lv_sys = lv_F + lv_N1 + lv_N2;
+  TVector3 boost = lv_sys.BoostVector();
+  TLorentzVector lv_N1cm = lv_N1;
+  lv_N1cm.Boost(-1*boost);
+  TLorentzVector lv_N2cm = lv_N2;
+  lv_N2cm.Boost(-1*boost);
+  TLorentzVector lv_Fcm = lv_F;
+  lv_Fcm.Boost(-1*boost);
+
+  double cosn1n2theta =  cos(lv_N1cm.Angle(lv_N2cm.Vect()));
+  //double cosn1n2theta =  cos(lv_Fcm.Angle(lv_N1cm.Vect()));
+  //cout << cosn1n2theta << endl;
+
+  TLorentzVector lvNN = lv_N1 + lv_N2;
+  double edecayNN = lvNN.M() - lv_N1.M() - lv_N2.M();
+  cout << edecayNN << endl;
+  //-----------
+  */
+
+  //Boosting all three particles to the lab frame
+  tl1.Boost(t3Boost);
+  tl2.Boost(t3Boost);
+  tl3.Boost(t3Boost);
+
+  // set fragment energy and direction
+  p->setEtotal(tl1.E()); /// \todo implement setLVec() to set particle data from 4-vector
+  p->setThetaPhi(tl1.Theta(),tl1.Phi()); 
+  
+  // set neutron energy and direction
+  pp.setEtotal(tl2.E());
+  pp.setThetaPhi(tl2.Theta(),tl2.Phi()); 
+
+  if(! newPart) ERR("Pointer newPart not set; Cannot add new particles");
+  newPart->push_back(pp); 
+
+  // set second neutron energy and direction
+  ppp.setEtotal(tl3.E());
+  ppp.setThetaPhi(tl3.Theta(),tl3.Phi());
+
+  if(! newPart) ERR("Pointer newPart not set; Cannot add new particles");
+  newPart->push_back(ppp); 
+
+  DSV(p->getA());
+  DSV(p->getZ());
+  return 0;
+}
+
+int StReacStripEvap_dineutron::savedValue(size_t part_id, string name, double* v) {
+  DSV(part_id);
+  DSV(name);
+  if (name == "exen" &&  (fExEnMap.find(part_id) != fExEnMap.end()) ) {
+    *v = fExEnMap[part_id];
+    DSV(*v);
+    return 0;
+  }
+  if (name == "exen2" &&  (fExEnMap2.find(part_id) != fExEnMap2.end()) ) {
+    *v = fExEnMap2[part_id];
+    DSV(*v);
+    return 0;
+  }
+  if (name == "ph" &&  (fPhiMap.find(part_id) != fPhiMap.end()) ) {
+    *v = fPhiMap[part_id];
+    DSV(*v);
+    return 0;
+  }
+  if (name == "ph2" &&  (fPhiMap2.find(part_id) != fPhiMap2.end()) ) {
+    *v = fPhiMap2[part_id];
+    DSV(*v);
+    return 0;
+  }
+  if (name == "th" &&  (fThetaMap.find(part_id) != fThetaMap.end()) ) {
+    *v = fThetaMap[part_id];
+    DSV(*v);
+    return 0;
+  }
+  if (name == "th2" &&  (fThetaMap2.find(part_id) != fThetaMap2.end()) ) {
+    *v = fThetaMap2[part_id];
+    DSV(*v);
+    return 0;
+  }
+  if (name == "pz" &&  (fPzMap.find(part_id) != fPzMap.end()) ) {
+    *v = fPzMap[part_id];
+    DSV(*v);
+    return 0;
+  }
+  return 1;
+}
+////////////////////////////di-neutron decay///////////////////////////////
+
+//---------------------3-body decay-------------------------//
+int StReacStripEvap_3bodydecay::act(StParticle* p, vector<StParticle>* newPart) {
+
+  //Setting up the two decay energies
+  double exen     = 0; //Total Decay Energy
+  double exen1    = 0; //1st Decay Energy
+  double exen2    = 0; //2nd Decay Energy
+  //Create Varibles to give give directions to particles and Glauber Kick
+  double cosTheta;     //Used to set the cos(Theta)
+  double theta;        //Used to set the Theta
+  double phi;          //Used to set the Phi
+
+  //for volya 2n
+  double erel = 0; //rel energy between 2 neutrons
+
+  //Check that all necassery random number generators are found
+  if (!fRngExEn)           ERR("Need fRngExEn");
+  if (!fRngExEn1)          ERR("Need fRngExEn1");
+  if (!fRngExEn2)          ERR("Need fRngExEn2");
+  if (!fRngUniform)        ERR("Need uniform random number generator");
+  if (!fRngGaussGlauber)   ERR("Need gauss random number generator");
+
+  //Removed the fWhichEnergyDoIReconstruct (since it isn't needed for 3body decay)
+
+  double exenTotal = -1;
+  while(1){
+    exenTotal = fRngExEn->value(); //MeV
+    if(exenTotal>0) break;
+  }
+
+  DSV(exenTotal);
+  DSV(exen2);
+  fExEnMap[0]=exenTotal;
+  fExEnMap2[0]=exen2;    
+  
+  //debugging stuff -> Decay Energies
+  if (debugSwitch == "exen1")
+	  cout << exen1<< endl;
+  if (debugSwitch == "exen2")
+	  cout << exen2<< endl;
+
+  if (!p) ERR("Particle pointer not set.");
+
+
+  // change particle, keep velocity the same
+  //**zwk reduce beta after reaction following LISE++
+  double beta = p->getBeta() * fVelocityScale;        // initial beta
+  double A = p->getA();            // initial mass number
+  p->setA(p->getA() - fNn - fNp);  // remove protons and neutrons
+  p->setm(p->getA()*931.494028);        // set new mass
+  p->setZ(p->getZ() - fNp);        // set new Z
+  p->setQ(p->getZ());              // set new Q
+  p->setBeta(beta);                // set velocity
+
+  TLorentzVector tl;
+  tl.SetPxPyPzE(p->getPx(), p->getPy(), p->getPz(), p->getEtotal());
+  DSV(tl.Theta());
+  DSV(tl.Phi());
+  DSV(tl.E() - tl.M());
+
+  fPzMap[0]=-1;
+  // Glauber momentum kick 
+  double sig, sig0;
+  sig0 = 90;  // MeV/c
+  sig = p->getA() * ( fNn + fNp ) / ( A - 1);
+  if (sig < 0) ERR("sig < 0; sig = %g", sig);
+  sig = fGlauberKickScale * sig0 * sqrt(sig);
+  DSV(sig);
+  
+  cosTheta = fRngUniform->value(-1,1);// cos(theta)
+  theta    = acos(cosTheta);
+  phi      = fRngUniform->value(0,2.*M_PI);  // phi
+  DSV(theta);
+  DSV(phi);
+
+  fRngGaussGlauber->setCentroid(0);
+  fRngGaussGlauber->setSigma(sig);
+
+  double glaubP = fRngGaussGlauber->value();
+  //-=-=-==--=-=-=-==
+  //idea to create tail in mom. distribution following LISE++, zwk
+  if(glaubP < 0) glaubP = glaubP * fAsymMomentum;
+  //--------------------
+
+  DSV(glaubP);
+  TVector3 vGlaubP(0,0,glaubP);
+  vGlaubP.SetTheta(theta);
+  vGlaubP.SetPhi(phi);
+  
+  TVector3 vP;                  // total momentum
+  vP = tl.Vect() + vGlaubP;
+  tl.SetVectM(vP,p->getm());
+  DSV(tl.Theta());
+  DSV(tl.Phi());
+  DSV(tl.E() - tl.M());
+  
+  //debugging stuff
+  if (debugSwitch == "thetaLABP")
+    cout << tl.Theta()<< endl;
+  if (debugSwitch == "phiLABP")
+    cout << tl.Phi()<< endl;
+  
+  
+  
+  //Now have the excited fragment in TLorentzVector tl
+  //Use 3-body decay from ROOT to decay Frag* -> frag + n +n
+  //Units are GeV and GeV/c!!
+  
+  //set lorentz vector of decaying system (GeV unit)
+  //need to set_mass to the same as the frag+2n since we don't know the mass excess of the 
+  //excited fragment, otherwise can get E of excited frag < then E of the frag-n-n system
+  //and therefore the 3-body decay is forbidden.
+  //double set_mass = (p->getA()-2)*931.494028 +  939.565346 + 939.565346;
+  double set_mass = (p->getA()-2)*931.494 +  1.0*931.494 + 1.0*931.494;
+  TLorentzVector t1gev;
+  t1gev.SetVectM(vP*(1/1000.), (set_mass+exenTotal)/1000.);
+
+  //cout << vP.x() << " " << vP.y() << " " << vP.z() << endl;
+  //cout << p->getm() << " " << p->getA() << endl;
+  //cout << exen1 << " " << exen2 << endl;
+  //cout << t1gev.M() << "  " << t1gev.Mag() << endl;
+  //cout << ( (p->getA()-2)*931.494028/1000. +  939.565346/1000. + 939.565346/1000.) << endl;
+  
+  //set the masses of the 3 products.
+  Double_t Mass3body[3] = { (p->getA()-2)*931.494/1000.,  1.0*931.494/1000., 1.0*931.494/1000.};
+  TGenPhaseSpace tPSevent;
+  Bool_t bevent = tPSevent.SetDecay(t1gev, 3, Mass3body);
+  if(!bevent) cerr << "3-Body Decay is Kinematically FORBIDDEN !!!!!" << endl;
+
+  TLorentzVector *pt1, *pt2, *pt3;
+
+  double wtmax = tPSevent.GetWtMax();
+  while(1){    
+    double weight = tPSevent.Generate();
+    double rel_weight = weight / wtmax;
+    double ran = fRngUniform->value(0,1);
+
+    //events are weighted (rel_weight) between 0 and 1
+    //therefore only select event when ran is less then rel_weight
+    //if(ran < rel_weight) break;
+    break; 
+  }
+  pt1 = tPSevent.GetDecay(0); //frag - 2n
+  pt2 = tPSevent.GetDecay(1); //neutron1
+  pt3 = tPSevent.GetDecay(2); //neutron2
+
+  //The returned Lorentz vectors are automatically boosted into the frame
+  //of the originally decaying fragment
+  //NEED TO CONVERT BACK FROM GEV TO MEV
+
+  //Set fragment info
+  p->setEkin(0);
+  p->setA(p->getA()-2);
+  p->setm(pt1->M()*1000);
+ // set fragment energy and direction
+  p->setEtotal(pt1->E()*1000); /// \todo implement setLVec() to set particle data from 4-vector
+  p->setThetaPhi(pt1->Theta(),pt1->Phi()); 
+  fThetaMap[0] = pt1->Theta();
+  fPhiMap[0]   = pt1->Phi();
+  fThetaMap2[0] = pt1->Theta();
+  fPhiMap2[0]   = pt1->Phi();
+  
+  // set neutron energy and direction
+  StParticle pp;
+  pp.setZ(0);
+  pp.setQ(0);
+  pp.setx(p->getx());     // same position
+  pp.sety(p->gety()); 
+  pp.setz(p->getz());     
+  pp.sett(p->gett());     // same time
+  pp.setEkin(0);
+  pp.setA(1);
+  pp.setm(pt2->M()*1000);
+  pp.setEtotal(pt2->E()*1000);
+  pp.setThetaPhi(pt2->Theta(),pt2->Phi()); 
+
+  if(! newPart) ERR("Pointer newPart not set; Cannot add new particles");
+  newPart->push_back(pp); 
+
+  // set second neutron energy and direction
+  StParticle ppp;   
+  ppp.setA(1);
+  ppp.setm(pt3->M()*1000);
+  ppp.setZ(0);
+  ppp.setQ(0);
+  ppp.setx(p->getx());     // same position
+  ppp.sety(p->gety()); 
+  ppp.setz(p->getz());     
+  ppp.sett(p->gett());     // same time
+  ppp.setEkin(0);
+  ppp.setEtotal(pt3->E()*1000);
+  ppp.setThetaPhi(pt3->Theta(),pt3->Phi());
+
+
+  /*
+  //-------
+  //Calculating angles, energy for output of the original nn correlations for PRL comment reply
+  TLorentzVector lv_F = *pt1;
+  TLorentzVector lv_N1 = *pt2;
+  TLorentzVector lv_N2 = *pt3;
+
+  TLorentzVector lv_sys = lv_F + lv_N1 + lv_N2;
+  TVector3 boost = lv_sys.BoostVector();
+  TLorentzVector lv_N1cm = lv_N1;
+  lv_N1cm.Boost(-1*boost);
+  TLorentzVector lv_N2cm = lv_N2;
+  lv_N2cm.Boost(-1*boost);
+  TLorentzVector lv_Fcm = lv_F;
+  lv_Fcm.Boost(-1*boost);
+
+  //double cosn1n2theta =  cos(lv_N1cm.Angle(lv_N2cm.Vect()));
+  double cosn1n2theta =  cos(lv_Fcm.Angle(lv_N1cm.Vect()));
+  cout << cosn1n2theta << endl;
+
+  TLorentzVector lvNN = lv_N1 + lv_N2;
+  double edecayNN = lvNN.M() - lv_N1.M() - lv_N2.M();
+  //cout << edecayNN << endl;
+  //-----------
+  */
+
+  if(! newPart) ERR("Pointer newPart not set; Cannot add new particles");
+  newPart->push_back(ppp); 
+
+  DSV(p->getA());
+  DSV(p->getZ());
+  return 0;
+}
+
+int StReacStripEvap_3bodydecay::savedValue(size_t part_id, string name, double* v) {
+  DSV(part_id);
+  DSV(name);
+  if (name == "exen" &&  (fExEnMap.find(part_id) != fExEnMap.end()) ) {
+    *v = fExEnMap[part_id];
+    DSV(*v);
+    return 0;
+  }
+  if (name == "exen2" &&  (fExEnMap2.find(part_id) != fExEnMap2.end()) ) {
+    *v = fExEnMap2[part_id];
+    DSV(*v);
+    return 0;
+  }
+  if (name == "ph" &&  (fPhiMap.find(part_id) != fPhiMap.end()) ) {
+    *v = fPhiMap[part_id];
+    DSV(*v);
+    return 0;
+  }
+  if (name == "ph2" &&  (fPhiMap2.find(part_id) != fPhiMap2.end()) ) {
+    *v = fPhiMap2[part_id];
+    DSV(*v);
+    return 0;
+  }
+  if (name == "th" &&  (fThetaMap.find(part_id) != fThetaMap.end()) ) {
+    *v = fThetaMap[part_id];
+    DSV(*v);
+    return 0;
+  }
+  if (name == "th2" &&  (fThetaMap2.find(part_id) != fThetaMap2.end()) ) {
+    *v = fThetaMap2[part_id];
+    DSV(*v);
+    return 0;
+  }
+  if (name == "pz" &&  (fPzMap.find(part_id) != fPzMap.end()) ) {
+    *v = fPzMap[part_id];
+    DSV(*v);
+    return 0;
+  }
+  return 1;
+}
+////////////////////////////3body decay///////////////////////////////
+
+
+
+/////////////////TWO BODY REACTION/////////////////////////////////////////////
+
+int StReacStripEvapTwoBody::act(StParticle* p, vector<StParticle>* newPart) {
+  if (!p)                ERR("Particle pointer not set.");
+  if (!fRngGaussQvalue)  ERR("Need gauss Q-value random number generator");
+  
+  fPzMap[0]=-1;
+  //calculate reaction energy based on input mean and spread
+  //cout << "My beam energy is " << p->getEkin()/p->getA() << " and " << p->getA() << endl;
+  fRngGaussQvalue->setCentroid(0.);
+  fRngGaussQvalue->setSigma(Qspread*Qval);
+  double Qchange = fRngGaussQvalue->value();
+  double Qset    = Qval + Qchange;
+  //debugging stuff
+  if (debugSwitch == "qValue")
+	  cout << Qset<< endl;
+#if 0
+	Qset = fRngUniform->value(-15.0, -5.0);
+#endif
+
+//cout << "My Qset is " << Qset << endl;
+
+// ***** If you use a target other than Be you need to change the mass in the following lines****
+  double Etot_lab = p->getEtotal() + 9.0*931.494028; //adds beam energy to tgt for total energy.
+  double B = p->getP() / Etot_lab; //calculates the beta of the CoM relative to lab 
+  double G = 1./sqrt(1. - B*B); //calculates gamma of CoM relative to lab
+
+//cout << "My B and G are " << B  << " and "<< G << endl;
+
+  //create 4-vector for our system in lab frame
+  TLorentzVector tl;
+  tl.SetPxPyPzE(p->getPx(), p->getPy(), p->getPz(), Etot_lab);
+
+  //calculate the boost needed to move from CoM to lab
+  TVector3 t3Boost;
+  t3Boost = tl.BoostVector();
+
+  //now move to CoM frame
+  double Etot_cm = Etot_lab / G; //calculate total energy in CoM
+  double Ekin_cm = Etot_cm - p->getm() - 9.0*931.494028 + Qset; //calculate kinetic energy in com
+
+
+  p->setA(p->getA() - fNn - fNp);  // remove protons and neutrons
+  p->setm(p->getA()*931.494028);        // set new mass
+  //  p->setm(7.028021*931.494028);        // set new mass
+  p->setZ(p->getZ() - fNp);        // set new Z
+  p->setQ(p->getZ());              // set new Q
+  //cout << "My Etot in com is " << Etot_cm << endl;
+  //cout << "My Ekin in com is " << Ekin_cm << endl;
+  
+  //reset total energy in com frame
+    Etot_cm = Ekin_cm + p->getm() + (9. + fNn + fNp)*931.494028;
+  //  Etot_cm = Ekin_cm + p->getm() + 10.012937*931.494028;
+
+  //reset total energy of reaction product we are interested in
+   p->setEtotal((Etot_cm*Etot_cm + p->getm()*p->getm() - ((9. + fNn + fNp)*931.494028*(9. + fNn + fNp)*931.494028))/(2.*Etot_cm));
+   // p->setEtotal((Etot_cm*Etot_cm + p->getm()*p->getm() - (10.012937*931.494028*10.012937*931.494028))/(2.*Etot_cm));
+  
+  //cout << "My Etot for product is " << p->getEtotal() << endl;
+  //cout << "My Ekin and Ekin/A and A are " << p->getEtotal() - p->getm() << " and "<< (p->getEtotal() - p->getm())/p->getA() << " and "<< p->getA() << endl;
+/////////////////////////////////////////////////////////////////////?
+//gaussian randomization of the angle
+double Theta_cmp; 
+
+  Theta_cmp = 0.;
+  if (distSwitchBool == 2)
+  {
+	  if (!fRngGaussGlauber) ERR("Need fRngGaussGlauber");
+	  do {
+	    Theta_cmp = fRngGaussGlauber->value();
+	    if (Theta_cmp > 1.0 || Theta_cmp < -1.0)
+	      {
+		Theta_cmp = -1.0;
+	      } else {
+//	      cout << "cos=  " <<Theta_cmp ;
+	    Theta_cmp = acos(Theta_cmp);
+	    //cout << Theta_cmp  <<endl;
+	    }
+	  } while (Theta_cmp > aUpLim || Theta_cmp < aLowLim);
+	  // fprintf(opf1,"%10.3e\n", Theta_cmp); 	  
+//	  cout << "theta=  "<< Theta_cmp  << endl;
+  }
+  else if (distSwitchBool == 1)
+  {
+	  if (!fRngGaussGlauber) ERR("Need fRngGaussGlauber");
+	  do {
+	    Theta_cmp = fRngGaussGlauber->value();
+	  } while (Theta_cmp > aUpLim || Theta_cmp < aLowLim);
+	  // fprintf(opf1,"%10.3e\n", Theta_cmp); 	  
+ //cout << Theta_cmp << endl;
+  }
+  else if (distSwitchBool == 0)
+  {
+	 double cosTheta_cmp = fRngUniform->value(cos(aLowLim), cos(aUpLim));
+	 Theta_cmp = acos(cosTheta_cmp);
+	 // fprintf(opf1,"%10.3e\n", Theta_cmp); 	  
+//	 cout << Theta_cmp << endl;
+  }
+  //debugging stuff
+  if (debugSwitch == "thetaCMP")
+	  cout << Theta_cmp<< endl;
+
+ ////////////////////////////////////////////////////////////////////
+  //randomize theta and phi in the CoM frame
+  //double cosTheta_cmp = fRngUniform->value(0.9,1);       // cos(theta) should range -1 1
+  //  double Theta_cmp = acos(cosTheta_cmp);
+  // double Theta_cmp = 0.0;
+  double Phi_cmp      = fRngUniform->value(0,2.*M_PI);  // phi
+  //debugging stuff
+  if (debugSwitch == "phiCMP")
+	  cout << Phi_cmp<< endl;
+
+  //calculate momentum of reaction product in com frame
+  double P_cmp = sqrt(p->getEtotal()*p->getEtotal() - gsl_pow_2(p->getm()));
+//cout << "My P total in com is " << P_cmp << endl;
+//cout << "My total energy is " << p->getEtotal() << endl;
+
+  //set 4-momentum in CoM frame
+  tl.SetPxPyPzE(0., 0., P_cmp, p->getEtotal());
+
+//cout << "My theta and phi are " << Theta_cmp * (180. / 3.14159) << " and " << Phi_cmp * (180. / 3.14159) << endl;
+  //set the direction of the produced nucleus properly
+  tl.SetTheta(Theta_cmp);
+  tl.SetPhi(Phi_cmp);
+/////////////////////////////// cout << Phi_cmp << endl; 
+  //boost back to lab frame
+  tl.Boost(t3Boost);
+  
+  //debugging stuff
+  if (debugSwitch == "thetaLABP")
+	  cout << tl.Theta() << endl;
+  //debugging stuff
+  if (debugSwitch == "phiLABP")
+	  cout << tl.Phi()<< endl;
+  //cout << "My lab energy and ke and ke/a and p are " << tl.E() << " and "<< tl.E() - p->getm() << " and " << (tl.E() - p->getm()) / p->getA() << " and " << endl; 
+  
+  //now calculate boost needed to move from CoM of reaction product to lab
+  t3Boost = tl.BoostVector();
+
+  /////////////////////////////////cout << tl.Phi() << endl;
+
+  // start of neutron evaporation
+  p->setA(p->getA() - 1);
+  p->setm(p->getA()*931.494028);
+  // p->setm(6.018889*931.494028);
+  p->setEkin(0);               // 23O at rest
+
+  TLorentzVector tl1;  // particle 1 (heavy fragment)
+  tl1.SetPxPyPzE(p->getPx(), p->getPy(), p->getPz(), p->getEtotal());
+
+  // create neutron
+  StParticle pp;   
+  pp.setA(1);
+  // pp.setm(pp.getA()*939.565346);
+      pp.setm(931.5);
+  pp.setZ(0);
+  pp.setQ(0);
+  pp.setx(p->getx());     // same position
+  pp.sety(p->gety()); 
+  pp.setz(p->getz());     
+  pp.sett(p->gett());     // same time
+  pp.setEkin(0);
+  
+  TLorentzVector tl2;  // particle 2 (neutron)
+  tl2.SetPxPyPzE(pp.getPx(), pp.getPy(), pp.getPz(), pp.getEtotal());
+  
+  double eN, eF;   // total neutron and fragment energy
+  double eCM;   // total CM energy
+  double exen;  // excitation energy
+
+  exen = 0;
+  if (!fRngExEn) ERR("Need fRngExEn");
+  do {
+    exen = fRngExEn->value();
+  } while (exen < 0);
+  DSV(exen);
+  fExEnMap[0]=exen;
+
+  //debugging stuff
+  if (debugSwitch == "exen")
+	  cout << exen<< endl;
+  //  cout<<exen<<endl;
+
+  eCM = pp.getm() + p->getm() + exen;  // total CM energy
+  eN = gsl_pow_2(eCM) + gsl_pow_2(pp.getm()) - gsl_pow_2(p->getm());
+  eN = eN/(2.*eCM);                    // total energy neutron
+  eF = gsl_pow_2(eCM) - gsl_pow_2(pp.getm()) + gsl_pow_2(p->getm());
+  eF = eF/(2.*eCM);                    // total energy of fragment
+
+  /// \todo check is arg of sqrt is positive
+  double pN,pF; // fragment and neutron momentum
+  pN = eN*eN - gsl_pow_2(pp.getm());
+  pN = sqrt(pN);
+  pF = eF*eF - gsl_pow_2(p->getm());
+  pF = sqrt(pF);
+  pF = -pF;  // fragment goes in opposit direction
+
+  tl1.SetPxPyPzE(0,0,pF,eF);
+  tl2.SetPxPyPzE(0,0,pN,eN);
+  
+  // set theta and phi to some random value
+  if (!fRngUniform) ERR("Need random number generator");
+  
+double  cosTheta = fRngUniform->value(-1,1);       // cos(theta)
+double  theta    = acos(cosTheta);
+//double  theta    = 0.0;
+double  phi      = fRngUniform->value(0,2.*M_PI);  // phi
+  
+  fThetaMap[0] = theta;
+  fPhiMap[0]   = phi;
+
+  tl1.SetTheta(theta);
+  tl2.SetTheta(M_PI - theta);
+  tl1.SetPhi(phi);
+
+  ///////////////////cout << phi << endl;
+  tl2.SetPhi(phi + M_PI);
+  //cout << "My frag and neutron thetas are " << theta*(180./3.14159) << " and " <<  (M_PI - theta)*(180./3.14159)<< endl;
+
+  // go to the lab
+  tl1.Boost(t3Boost);
+  tl2.Boost(t3Boost);
+
+ //cout << tl1.Phi() << endl;
+  // set fragment energy and direction
+  p->setEtotal(tl1.E()); /// \todo implement setLVec() to set particle data from 4-vector
+  p->setThetaPhi(tl1.Theta(),tl1.Phi()); 
+  
+  //cout << "My absolute final frag energy/A is " << (p->getEtotal() - p->getm()) / p->getA() << endl;
+  //cout << (p->getEtotal() - p->getm()) / p->getA()<< endl;
+  // set neutron energy and direction
+  pp.setEtotal(tl2.E());
+  pp.setThetaPhi(tl2.Theta(),tl2.Phi()); 
+  //cout << "My absolute final neutron energy/A is " << pp.getEtotal() - pp.getm() << endl;
+//cout  << pp.getEtotal() - pp.getm() << endl;
+  if(! newPart) ERR("Pointer newPart not set; Cannot add new particles");
+  newPart->push_back(pp); 
+
+  DSV(p->getA());
+  DSV(p->getZ());
+  return 0;
+}
+
+int StReacStripEvapTwoBody::savedValue(size_t part_id, string name, double* v) {
+  DSV(part_id);
+  DSV(name);
+  if (name == "exen" &&  (fExEnMap.find(part_id) != fExEnMap.end()) ) {
+    *v = fExEnMap[part_id];
+    DSV(*v);
+    return 0;
+  }
+  if (name == "ph" &&  (fPhiMap.find(part_id) != fPhiMap.end()) ) {
+    *v = fPhiMap[part_id];
+    DSV(*v);
+    return 0;
+  }
+  if (name == "th" &&  (fThetaMap.find(part_id) != fThetaMap.end()) ) {
+    *v = fThetaMap[part_id];
+    DSV(*v);
+    return 0;
+  }
+  if (name == "pz" &&  (fPzMap.find(part_id) != fPzMap.end()) ) {
+    *v = fPzMap[part_id];
+    DSV(*v);
+    return 0;
+  }
+  // fclose(opf1);
+  return 1;
+}
+

@@ -1,0 +1,17 @@
+#INFO("Using default values for 05124-z8n12 (FRAG II)");
+        eBeam           = 60.0;
+        beamA           = 48;
+        beamZ           = 20;
+        dTarget         = 94.0; 
+        dEbeam          = 0.005;
+        resTime         = .3;
+        nNeutr          = 15;
+        nProt           = 12;
+        bSpotDx         = 0.004; 
+        bSpotDy         = 0.005; 
+        bSpotDtx        = 0.008; 
+        bSpotDty        = 0.005; 
+	crdc1MaskLeft   =  0.15;
+        crdc1MaskRight  = -0.15;
+        crdc2dist       = 1.823;
+        monaDist        = 15.385;

@@ -1,0 +1,4 @@
+This directory is intended for the storage of *small* root files output
+by st_mona and st_geant, or for the storage of temporary root files which
+can be deleted relatively shortly after being created.  Large and long-lived
+files should be stored somewhere in /evtdata/mona-sim-data.

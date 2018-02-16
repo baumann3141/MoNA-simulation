@@ -1,0 +1,19 @@
+#gfortran niclisma.for -o 'nic'
+rm fort.14
+rm fort.13
+rm smali.dat
+f2c niclisma.f
+gcc -lf2c -lm -o nic niclisma.c
+echo "nn-Li11_pha">gui
+./nic < gui
+gfortran phase.for
+./a.out
+rm Q*
+gfortran simp.for
+./a.out
+rm phase_s.dat
+rm nic
+rm gui
+rm a.out
+mv phase_s2.dat phase_ang.dat
+

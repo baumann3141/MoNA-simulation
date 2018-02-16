@@ -1,0 +1,143 @@
+#ifndef OUTPUTHANDLER
+#define OUTPUTHANDLER
+// C++ library includes
+#include <G4String.hh>
+#include <vector>
+#include <map>
+// Geant4 library includes
+#include "G4ThreeVector.hh"
+// ROOT library includes
+#include <TFile.h>
+#include <TTree.h>
+#include <TBranch.h>
+#include <TObject.h>
+// My file includes
+#include "Array.hh"
+#include "TrackerHit.hh"
+#include "InputFileObject.hh"
+
+// Forward declaration
+class Array;
+class TrackerHit;
+// A support class. This class gets written out to the root file
+// and contains all the information about the hits in a particular array.
+// If I ever specify any output besides the .root output (i.e. ascii)
+// This will still be utilized... after all, we are going for generality :)
+// TODO: you might want to put this in another file because
+// having the object in hand might be useful for analysis code
+// TODO: this looks a lot like a hit class. Why are you duplicating so much code?
+// you should have your output object simply contain a vector of hit classes or something
+class ArrayHits// : public TObject
+{
+    public:
+        ArrayHits();
+        ~ArrayHits();
+
+    private:
+        // TODO: do you want to be able to customize the max hit number by array?
+        G4int maxHits;                          // The max number of hits recorded
+        G4int multiHit;                         // The actual multiplicity of the event. Can be > the maxHits
+  G4int fZ2mult;
+  G4int fZ1mult;
+  G4int fZGt2mult;
+  G4int fGmult;
+  G4int fInputFileEventID;
+        std::vector<TrackerHit> hits;           // Records the hits.
+        /*
+        std::vector<G4ThreeVector> hitPos;      // Records the position of hits 
+        std::vector<G4double>      hitTime;     // Records the time of hits 
+        std::vector<G4double>      hitEnergy;   // Records the energy deposition of hits 
+        std::vector<G4String>      hitName;     // Records the name of struck detector
+        std::vector<G4int>         hitDetID;    // Records the ID number of struck detector
+        */
+
+    public:
+        // Set Functions
+        void setMaxHits(G4int inMaxHits) {maxHits = inMaxHits;}
+        void setMultiHit(G4int inMultiHit) {multiHit = inMultiHit;}
+        void setZ2Mult(G4int i) {fZ2mult = i;}
+        void setZ1Mult(G4int i) {fZ1mult = i;}
+        void setZGt2Mult(G4int i) {fZGt2mult = i;}
+        void setGMult(G4int i) {fGmult = i;}
+        void setHits(std::vector<TrackerHit> inHits) {hits = inHits;}
+  void SetInputFileEventID(G4int i) {fInputFileEventID = i;}
+        /*
+        void setHitPos(std::vector<G4ThreeVector>* inHitPos) {hitPos = *inHitPos;}
+        void setHitTime(std::vector<G4double>* inHitTime) {hitTime = *inHitTime;}
+        void setHitEnergy(std::vector<G4double>* inHitEnergy) {hitEnergy = *inHitEnergy;}
+        void setHitName(std::vector<G4String>* inHitName) {hitName = *inHitName;}
+        void setHitDetID(std::vector<G4int>* inHitDetID) {hitDetID = *inHitDetID;}
+        */
+
+        // Get Functions
+        G4int getMaxHits() {return maxHits;}
+        G4int getMultiHit() {return multiHit;}
+        G4int* getMultiHitA() {return &multiHit;}
+        G4int getZ2Mult() {return fZ2mult;}
+        G4int* getZ2MultA() {return &fZ2mult;}
+        G4int getZ1Mult() {return fZ1mult;}
+        G4int* getZ1MultA() {return &fZ1mult;}
+        G4int getZGt2Mult() {return fZGt2mult;}
+        G4int* getZGt2MultA() {return &fZGt2mult;}
+        G4int getGMult() {return fGmult;}
+        G4int* getGMultA() {return &fGmult;}
+        G4int getInputFileEventID() {return fInputFileEventID;}
+        G4int* getInputFileEventIDA() {return &fInputFileEventID;}
+        std::vector<TrackerHit> getHitVec() {return hits;}
+        TrackerHit* getHitVecA(int i) {return &hits[i];}
+        //ClassDef(ArrayHits,1)  //testing adding root class
+};
+
+// This class is intended to handle the output to file of the simulation
+// It will communicate with the TrackerSD class (sensitive detectors) -
+// in particular the EndOfEvent function to get the info out
+class OutputHandler
+{
+    public:
+        OutputHandler();
+        OutputHandler(G4String rootfilename);
+        ~OutputHandler();
+
+    private:
+        G4String oFileName;                     // Output File Name
+        G4String oFileType;                     // Output File Type (for now only .root output)
+        // TODO: do you really want to have it containing this info in the class?
+        std::vector<Array*> builtArrays;        // this contains all the detector setup information
+        // TODO: make it so that the outfile can be generalized to other forms of output (e.g. ascii columns)
+        TFile* outFile;                         // The output file we are writing to
+        TTree* outTree;                         // The output tree containing event data
+        // TODO: as with several other instances, do you want this to actually be a dictionary?
+        std::map<G4String,TBranch*> outBranches;      // The branches for the tree (probably do one per array)
+        std::map<G4String,ArrayHits*> outArrayHits;   // The objects to be written to file
+        // TODO: putting a global threshold here seems like a bad idea.
+        // figuring out the digitization classes might be a better thing in the long run
+        G4double threshold;
+
+
+  InputFileObject *fInputFileObject; 
+
+    public:
+        // Set Functions
+        void setOFileName(G4String inOFileName) {oFileName = inOFileName;}
+        void setOFileType(G4String inOFileType) {oFileType = inOFileType;}
+        void setBuiltArrays(std::vector<Array*> inBuiltArrays) {builtArrays = inBuiltArrays;}
+        void setThreshold(G4double t) {threshold = t;}
+
+        // Get Functions
+        G4String getOFileName() {return oFileName;}
+        G4String getOFileType() {return oFileType;}
+        std::vector<Array*> getBuiltArrays() {return builtArrays;}
+        TFile* getOutFile() {return outFile;}
+        TTree* getOutTree() {return outTree;}
+        G4double getThreshold() {return threshold;}
+
+        // Logistical Functions
+        // TODO: would you rather pass an argument to this instead?
+        void initializeOutput();   // Initializes the output e.g. creates tree
+
+        // Data Entry Functions
+        void writeConfiguration(); // Writes the detector setup to file
+  void writeEventData(TrackerHitsCollection* trackerCollection, G4int *pMult);     // Writes the hit information after each event
+        void closeout();           // Closeout actions like closing the output file
+};
+#endif

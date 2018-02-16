@@ -1,0 +1,22 @@
+#INFO("Using default values for 06025- B15 decay");
+	cosymap		= "m15B_06025";
+	eBeam 		= 54.0;
+        beamA           = 17;
+        beamZ           = 6;
+        dTarget         = 470; 
+        dEbeam          = 0.006;
+        resTime         = .3;
+        nNeutr          = 0;
+        nProt           = 1;
+        bSpotCx         = 0.004; # from experimental im parameters 
+        bSpotCy         = 0.0;  
+        bSpotCtx        = 0.00; 
+        bSpotCty        = -0.001; 
+	bSpotDtx        = 0.006;
+	bSpotDx         = 0.007;
+	bSpotDty        = 0.004;
+	bSpotDy         = 0.002;
+        crdc1MaskLeft   =  0.09;
+        crdc1MaskRight  = -0.09;
+        crdc2dist       = 1.829;
+        monaDist        = 7.904;

@@ -1,0 +1,1342 @@
+/** \file
+ * Random number generator stuff (implementation)
+ */
+#include <time.h>
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <math.h>
+#include <gsl/gsl_sf_bessel.h>
+#include <gsl/gsl_sf_legendre.h>
+#include <gsl/gsl_histogram.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include "st_histo_tuple.hh"
+#include "st_rng.hh"
+#include "TGraph.h"
+#include "TMath.h"
+#include "TUUID.h"
+
+using namespace std;
+
+StGSLrng::StGSLrng() {
+  gsl_rng_env_setup();
+  fT = gsl_rng_default;
+  fR = gsl_rng_alloc (fT);
+}
+
+StGSLrng::~StGSLrng() {
+  gsl_rng_free(fR);
+}
+
+
+double StRNG::value(double l, double u) {  // this makes a cut in the distribution
+  if (l >= u) ERR("l>=u: %f %f",l,u);
+  double v;
+  do v = value(); while (v < l || v > u);
+  return v;
+}
+
+// ######################################################
+
+StRNGGaussGSL::StRNGGaussGSL(StGSLrng* rr, double c, double s) : fR(rr) {
+  fCentroid=c; 
+  fSigma=s;
+}
+double StRNGGaussGSL::value () {
+  if (fSigma == 0) return fCentroid;
+  return fCentroid + gsl_ran_gaussian(fR->getr(),fSigma);
+}
+
+// ######################################################
+
+StRNGExpGSL::StRNGExpGSL(StGSLrng* rr, double c) : fR(rr) {
+  fCentroid=c; 
+}
+double StRNGExpGSL::value () {
+  return gsl_ran_exponential(fR->getr(),fCentroid);
+}
+
+// ######################################################
+StRNGCustombwGSL::StRNGCustombwGSL(gsl_histogram_pdf* hh, StGSLrng* rr, double c, double s) : fR(rr) {
+  fCentroid=c; 
+  fSigma=s;
+  fP = hh;
+}
+double StRNGCustombwGSL::value () {
+  double RanNum =  gsl_ran_flat(fR->getr(),0,1);
+  double Val = gsl_histogram_pdf_sample (fP,RanNum);
+  
+  return Val; 
+}
+
+// ######################################################
+StRNGLaplaceGSL::StRNGLaplaceGSL(StGSLrng* rr, double c, double s) : fR(rr) {
+  fCentroid=c; 
+  fSigma=s;
+}
+double StRNGLaplaceGSL::value () {
+  if (fSigma == 0) return fCentroid;
+  return fCentroid + gsl_ran_laplace(fR->getr(),fSigma);
+}
+
+// ####DOUBLE LAPLACIAN RNG FOR MONA RESOLUTION##########
+//Create an instance of the DoubleLaplaceRNG Class that takes in an StGSLrng*,
+// two centroids,two sigmas, and a percentage that chooses how much of the total area 
+// should belong to each Laplacian.
+
+StRNGDoubleLaplaceGSL::StRNGDoubleLaplaceGSL( StGSLrng* rr, double c1, double s1, double c2, double s2, double p) : fR(rr) {
+  fCentroid1=c1; 
+  fSigma1=s1;
+  fCentroid2=c2; 
+  fSigma2=s2;
+  Prcnt=p;
+}
+
+
+// make a call to a uniform gsl RNG to get a random number between 0 and 1 that "chooses"
+// which Laplacian to generate (based on whether the uniform random number is > or < the
+// "Prcnt" variable. Then make a call to a laplacian RNG to output a laplacian with the 
+// correct width and centroid:
+
+double StRNGDoubleLaplaceGSL::value () {
+  if (gsl_rng_uniform(fR->getr()) <= Prcnt) return fCentroid1 + gsl_ran_laplace(fR->getr(), fSigma1);
+
+  // ^^^ return a laplacian with Sigma1 and Centroid1 if 
+  // ^^^ uniform RNG <= Prcnt.
+
+  return fCentroid2 + gsl_ran_laplace(fR->getr(), fSigma2);
+                                           
+  // ^^^ Otherwise return a laplacian with Sigma2 & Centroid 2.
+}
+
+// ######################################################
+StRNGCauchyGSL::StRNGCauchyGSL(StGSLrng* rr, double c, double s) : fR(rr) {
+  fbwCentroid=c; 
+  fbwSigma=s;
+
+  printf("BW-Cauchy: Center %f  Sigma %f\n",c,s);
+}
+double StRNGCauchyGSL::value () {
+  if (fbwSigma == 0) return fbwCentroid;
+  //printf("fSigma fCentroid test: %f   %f\n",fbwCentroid, fbwSigma);
+  return fbwCentroid + gsl_ran_cauchy(fR->getr(),fbwSigma);
+}
+
+// ######################################################
+StRNGGammaGSL::StRNGGammaGSL(StGSLrng* rr, double a, double b) : fR(rr) {
+  fA = a; 
+  fB = b;
+}
+double StRNGGammaGSL::value () {
+  double v;
+  v = gsl_ran_gamma(fR->getr(), fA, fB);
+  return v;
+}
+//ANK: 6-2-2016 taken from JKS for multiple component beam distribution
+// ######################################################
+// Added by JKS on 5 November 2012, exponential power distribution
+// Also known as a generalized normal distribution
+StRNGExpPowerGSL::StRNGExpPowerGSL(StGSLrng* rr, double a, double b, double c): fR(rr){
+  fA = a;
+  fB = b;
+  fC = c;
+}
+double StRNGExpPowerGSL::value(double a, double b, double c){
+	double v;
+	v = gsl_ran_exppow(fR->getr(),a,b) + c;
+	//cout << "v = " << v << endl;
+	return v;
+}
+double StRNGExpPowerGSL::value(){
+	return value(fA,fB,fC);
+}
+// ######################################################
+
+
+
+// ######################################################
+StRNGUniformGSL::StRNGUniformGSL(StGSLrng* rr, double l, double u) : fR(rr) {
+  fLower=l;
+  fUpper=u;
+}
+double StRNGUniformGSL::value () {return value(fLower, fUpper);}
+double StRNGUniformGSL::value (double l, double u) {
+  return gsl_ran_flat(fR->getr(), l, u);
+}
+
+// ######################################################
+StRNGLegendreGSL::StRNGLegendreGSL(StGSLrng* rr, double lvalue) : fR(rr) {
+
+
+  //int n=181; // Number of bins, fix this for now
+  int n=1000001;
+  double degree;
+  double cosangle;
+  double cross_section;
+  double a=-1.0; //0.0;  //Lower limit in degrees  
+  double b=1.0; //Upper limit in degrees
+
+
+  fH = gsl_histogram_alloc (n); // define histo gram and alloc
+  gsl_histogram_set_ranges_uniform (fH, a, b); // set range and bins
+
+  /*ifstream indata; // indata is like cin
+  indata.open("/projects/mona-sim/jonesm/st_mona/bin/angular_distribution_dp.dat"); // opens the file
+  if(!indata) { // file couldn't be opened
+      	cerr << "Error: file could not be opened" << endl;
+  }
+  indata >> degree >> cross_section;
+  while ( !indata.eof() ) 
+  { 
+	angle = degree*M_PI/180.0;
+    	gsl_histogram_accumulate (fH,angle,cross_section); // add value to histogram
+      	indata >> degree >> cross_section;
+  }
+  indata.close();*/
+
+
+
+
+  for(int i = 1; i < n-1; i++){
+      cosangle = i*2.0/(n-1) - 1; //cout << "cos(angle): " << degree << endl;
+      degree = acos(cosangle);
+      cross_section = gsl_sf_legendre_Pl(lvalue,cosangle)*gsl_sf_legendre_Pl(lvalue,cosangle);
+      gsl_histogram_accumulate(fH,cosangle,cross_section);//add value to histogram
+    //gsl_histogram_accumulate(fH,degree,degree);//add value to histogram
+   // gsl_histogram_increment(fH,i);
+
+  }
+   cout << "Mean: " << gsl_histogram_mean(fH) << endl;
+  // Create PDF from histogram
+  fP = gsl_histogram_pdf_alloc (n); // init PDF 
+  cout << "alloc" << endl;
+  gsl_histogram_pdf_init (fP,fH);// Make pdf with histogram dist.
+  cout << "init" << endl;
+  gsl_histogram_free(fH); // free histogram ... tried to free pdf but didnt work CRH
+  cout << "free" << endl;
+}
+  double StRNGLegendreGSL::value () {
+  double RanNum =  gsl_ran_flat(fR->getr(),0,1);//0,1
+  double Val = gsl_histogram_pdf_sample (fP,RanNum);
+  //double Val = gsl_sf_legendre_Pl(1,RanNum);
+  return Val; 
+}
+
+
+// ######################################################
+StRNGCos_twoneutronGSL::StRNGCos_twoneutronGSL(StGSLrng* rr, double l, double u) : fR(rr) {
+  fLower=l;
+  fUpper=u;
+}
+double StRNGCos_twoneutronGSL::value () {return value(fLower, fUpper);}
+double StRNGCos_twoneutronGSL::value (double l, double u) {
+  return acos(gsl_ran_flat(fR->getr(), -1, 1))/M_PI;
+}
+
+// ######################################################
+StRNGCustomE1::StRNGCustomE1(StGSLrng* rr, double l, double u) : fR(rr) {
+  fLower=l;
+  fUpper=u;
+}
+double StRNGCustomE1::value () {return value(fLower, fUpper);}
+double StRNGCustomE1::value (double l, double u) {
+  //
+
+  //initialize the Custom function to 0.001
+  for(int i=0; i < 100; i++)  fx[i] = 0.01;
+
+  // set fx[i] to percent of maximum in 0.1 MeV bins 
+  // (first bin is from 0.0 to 0.1)
+
+  fx[0]=0.336338647;
+  fx[1]=0.823705908;
+  fx[2]=0.987367259;
+  fx[3]=0.959218814;
+  fx[4]=0.862574514;
+  fx[5]=0.750994173;
+  fx[6]=0.645079573;
+  fx[7]=0.551543708;
+  fx[8]=0.471493392;
+  fx[9]=0.403929981;
+  fx[10]=0.34720906;
+  fx[11]=0.299629118;
+  fx[12]=0.259650721;
+  fx[13]=0.225957302;
+  fx[14]=0.197453608;
+  fx[15]=0.173240417;
+  fx[16]=0.152583766;
+  fx[17]=0.134885543;
+  fx[18]=0.119657541;
+  fx[19]=0.095088893;
+  fx[20]=0.08515252;
+  fx[21]=0.076468968;
+  fx[22]=0.068853947;
+  fx[23]=0.062153739;
+  fx[24]=0.056239816;
+  fx[25]=0.05100419;
+  fx[26]=0.046355585;
+  fx[27]=0.042216815;
+  fx[28]=0.03852242;
+  fx[29]=0.035216471;
+  fx[30]=0.032251026;
+  fx[31]=0.029584998;
+  fx[32]=0.027182951;
+  fx[33]=0.02501425;
+  fx[34]=0.023052345;
+  fx[35]=0.021274113;
+  fx[36]=0.019659431;
+  fx[37]=0.018190718;
+  fx[38]=0.016852532;
+  fx[39]=0.015631296;
+  fx[40]=0.014515074;
+  fx[41]=0.013493328;
+
+  /*
+    values of calculated virtual photon E1 excitation for 11Be on Au target
+    in 0.1 MeV bins from 0.504 Sn
+    0.336338647 0.823705908 0.987367259 0.959218814 0.862574514 0.750994173 0.645079573
+    0.551543708 0.471493392 0.403929981 0.347209061 0.299629118 0.259650721 0.225957302
+    0.197453608 0.173240417 0.152583766 0.134885543 0.119657541 0.106500832 0.095088893
+    0.08515252 0.076468968 0.068853947 0.062153739 0.056239816 0.05100419 0.046355585
+    0.042216815 0.03852242 0.035216471 0.032251026 0.029584998 0.027182951 0.02501425
+    0.023052345 0.021274113 0.019659431 0.018190718 0.016852532 0.015631296 0.014515074
+    0.013493328 0.012556712 0.01169695 0.010906704 0.010179425 0.009509272 0.008891018
+
+  */
+
+  do {
+    //get energy value
+    x =  gsl_ran_flat(fR->getr(), l, u);
+    xe = x*10.0;
+    // convert to integer value for array
+    xi = (int) xe;
+    // get probability value
+    y = gsl_ran_flat(fR->getr(), 0.0, 1.0);
+    //  ERR("x and y and fx and xi and xe: %f %f %f %i %f ",x,y,fx[xi],xi,xe);
+    // if probability is less than value for array of function, keep trying with new x,y
+  } while (y > fx[xi]);
+  
+  // output original x
+  v=( xe / 10.0);
+  return v;
+  
+}
+
+// ######################################################
+
+StRNGAsymmetricBWGSL::StRNGAsymmetricBWGSL(StGSLrng* rr, double par1, double par2,int par3,int par4,int par5) : fR(rr) {
+
+  Ezero = par1;
+  Width = par2;
+  angMom = par3;
+  fragMass = par4;
+  flagGamma = par5;
+
+  printf("AsymBW: E=%f Width=%f L=%d flagGamma=%d fragMass=%d\n",Ezero,Width,angMom,flagGamma,fragMass);
+
+  int n=1000000; // Number of bins, no particular reason for 100000
+  double a=0.0;  //Lower limit in MeV, can be expanded if need be  
+  double b=10.0; //Upper limit in MeV, can be expanded if need be
+
+  fH = gsl_histogram_alloc (n); // define histo gram and alloc
+  gsl_histogram_set_ranges_uniform (fH, a, b); // set range and bins
+
+  double y[1000001] = {0.0}; // Array to hold function
+      
+  // Get Constants
+  double hBarC = 197.3269631; // MeV fm
+  double Nmass = 939.565346; //  MeV
+  double amu = 931.494028; // from Nist
+  double nucRad = 1.4; // fm from Lane and Thomas pg 266 *1.2*
+  double Const = (1.0 /3.14159265 ); // Const for BW        
+  double redMass = (((Nmass/amu)*fragMass)/(Nmass/amu + fragMass))*amu; // reduced mass from lane in amu
+  double k = sqrt(2.0 * redMass) / hBarC; // k in terms of sqrt(Energy)
+  double Radius = nucRad * (pow(fragMass,1.0/3.0) + pow(Nmass/amu, 1.0/3.0)); // Nuclear Radius (A1^(1/3) + A2^(1/3)) 
+  // Create the BW function //    
+  for(int i=1; i < 1000001; i++) {
+    double En=i*0.00001; // Convert bins to energy in MeV
+    double x = k*Radius*sqrt(En); // X = k*R with energy included
+    double x0 = k*Radius*sqrt(Ezero);
+     
+    //Call functions for Penetribility
+    double jl = x * gsl_sf_bessel_jl (angMom,x); // Regular Spherical Bessel * x
+    double nl = x * gsl_sf_bessel_yl (angMom,x); // Irregular Spherical Bessel * x
+    double PenL = x / (nl*nl + jl*jl); // Penetrability as a function of E,W,L
+
+    //Functions with the resonance enrgy inputed
+    double jl0 = x0 * gsl_sf_bessel_jl (angMom,x0); // Regular Spherical Bessel * x
+    double nl0 = x0 * gsl_sf_bessel_yl (angMom,x0); // Irregular Spherical Bessel * x
+    double PenL0 = x0 / (nl0*nl0 + jl0*jl0); // Penetrability as a function of E,W,L
+ 
+    double bound = 0; // Define the boundary condition
+    double shift = 0; // Difine the shift function
+
+    //zwk, check this fro angMom==0
+    if(angMom ==0){
+      shift = 0;
+      bound = 0;
+      //ANK: changed on 4-11-2014 by the suggestion of Michael Thoennessen. This seems to make B-W go to zero without sharp cutoff
+      //PenL = 1;
+      //PenL0 = 1;
+      //PenL = x;
+      //PenL0 = x0;
+    }
+     
+    if(angMom == 1) { //
+      shift = - 1 / ( 1 + pow(x,2)); // From lane and thomas, i.e. x*(F'*F+G'*G)/(F*F+G*G)
+      bound = -1/ ( 1 + pow(x0,2)); // Set boudary so shift = 0 at eigen value (i.e. Decay energy)
+    }
+
+    if(angMom == 2) { // Same as above for l = 2
+      shift = -3*(pow(x,2)+6)/(pow(x,4)+9+3*pow(x,2));
+      bound = -3*(pow(x0,2)+6)/(pow(x0,4)+9+3*pow(x0,2));  
+    }
+
+    if(angMom == 3) {//ANK: added 2/16/16 for l=3 transition
+    shift = -3*(2*pow(x,3)+30*x+225)/(pow(x,3)+6*pow(x,2)+45*x+225); 
+    bound = -3*(2*pow(x0,3)+30*x0+225)/(pow(x0,3)+6*pow(x0,2)+45*x0+225);
+    }
+
+    double redGamma = 0.0;
+    double delta = 0.0;
+    double Gamma = 0.0;
+    double obsGamma = 0.0;
+
+    if(flagGamma == 1) {  // For use with Gflag - reduced width
+      redGamma = Width;
+      delta = -( shift - bound ) * redGamma * redGamma; // Full shift function
+      Gamma = 2.0 * redGamma * redGamma * PenL; // Width 
+    } else if (flagGamma == 0){ // default --observed width CRH 5/12/08
+      obsGamma = Width;
+      delta = - ( shift - bound)* (obsGamma / (2 * PenL0)); 
+      Gamma = (obsGamma / PenL0)*PenL;
+    }
+      
+    double BW = Const * ( (Gamma / 2.0) / ((Ezero + delta - En)*(Ezero + delta - En) + (Gamma*Gamma) / 4.0));
+    // Full BW with shift and pen functions included pg 322 Lane and Thomas 
+
+    y[i]=BW; // Add value to array
+    gsl_histogram_accumulate (fH,En,y[i]); // add value to histogram
+  }
+   
+  // Create PDF from histogram
+  fP = gsl_histogram_pdf_alloc (n); // init PDF
+  gsl_histogram_pdf_init (fP,fH); // Make pdf with histogram dist.
+
+  gsl_histogram_free(fH); // free histogram ... tried to free pdf but didnt work CRH
+
+}
+//double StRNGAsymmetricBWGSL::value () {return value(fLower, fUpper);}
+//double StRNGAsymmetricBWGSL::value (double l, double u) {
+double StRNGAsymmetricBWGSL::value () {
+  double RanNum =  gsl_ran_flat(fR->getr(),0,1);
+  double Val = gsl_histogram_pdf_sample (fP,RanNum);
+  
+  return Val; 
+}
+
+// ######################################################
+StRNGEtotal_11LiGSL::StRNGEtotal_11LiGSL(StGSLrng* rr, double par1) : fR(rr) {
+
+  Eb = par1;
+
+  int n=5000000; // Number of bins, no particular reason for 100000
+  double a=0.0;  //Lower limit in MeV, can be expanded if need be  
+  double b=50.0; //Upper limit in MeV, can be expanded if need be
+
+  fH = gsl_histogram_alloc (n); // define histo gram and alloc
+  gsl_histogram_set_ranges_uniform (fH, a, b); // set range and bins
+
+  double y[5000001] = {0.0}; // Array to hold function
+      
+  // Create the BW function //    
+  for(int i=1; i < 5000001; i++) {
+    double En=i*0.00001; // Convert bins to energy in MeV      
+    double BW = pow(En,2)/pow(2.21*Eb+En,3.5);
+    //double BW = pow(En,2)/pow(2.21*Eb+En,2.72);
+
+    y[i]=BW; // Add value to array
+    gsl_histogram_accumulate (fH,En,y[i]); // add value to histogram
+  }
+   
+  // Create PDF from histogram
+  fP = gsl_histogram_pdf_alloc (n); // init PDF
+  gsl_histogram_pdf_init (fP,fH); // Make pdf with histogram dist.
+
+  gsl_histogram_free(fH); // free histogram ... tried to free pdf but didnt work CRH
+
+}
+  double StRNGEtotal_11LiGSL::value () {
+  double RanNum =  gsl_ran_flat(fR->getr(),0,1);
+  double Val = gsl_histogram_pdf_sample (fP,RanNum);
+  
+  return Val; 
+}
+
+// ######################################################
+StRNGE_12LiGSL::StRNGE_12LiGSL(StGSLrng* rr, double par1) : fR(rr) {
+
+  Eb = par1;
+
+  int n=5000000; // Number of bins, no particular reason for 100000
+  double a=0.0;  //Lower limit in MeV, can be expanded if need be  
+  double b=50.0; //Upper limit in MeV, can be expanded if need be
+
+  fH = gsl_histogram_alloc (n); // define histo gram and alloc
+  gsl_histogram_set_ranges_uniform (fH, a, b); // set range and bins
+
+  double y[5000001] = {0.0}; // Array to hold function
+      
+  // Create the BW function //    
+  for(int i=1; i < 5000001; i++) {
+    double En=i*0.00001; // Convert bins to energy in MeV      
+    double BW = pow(En,0.5)/pow(1.69*Eb+En,2);
+
+    y[i]=BW; // Add value to array
+    gsl_histogram_accumulate (fH,En,y[i]); // add value to histogram
+  }
+   
+  // Create PDF from histogram
+  fP = gsl_histogram_pdf_alloc (n); // init PDF
+  gsl_histogram_pdf_init (fP,fH); // Make pdf with histogram dist.
+
+  gsl_histogram_free(fH); // free histogram ... tried to free pdf but didnt work CRH
+
+}
+  double StRNGE_12LiGSL::value () {
+  double RanNum =  gsl_ran_flat(fR->getr(),0,1);
+  double Val = gsl_histogram_pdf_sample (fP,RanNum);
+  
+  return Val; 
+}
+
+#include <iostream>
+#include <fstream>
+// ######################################################
+StRNGangular_distribution_dpGSL::StRNGangular_distribution_dpGSL(StGSLrng* rr) : fR(rr) {
+
+
+  int n=181; // Number of bins
+  double degree;
+  double angle;
+  double cross_section;
+  double a=0.0;  //Lower limit in degrees  
+  double b=M_PI; //Upper limit in degrees
+
+
+  fH = gsl_histogram_alloc (n); // define histo gram and alloc
+  gsl_histogram_set_ranges_uniform (fH, a, b); // set range and bins
+
+  ifstream indata; // indata is like cin
+  indata.open("/projects/mona-sim/jonesm/st_mona/bin/angular_distribution_dp.dat"); // opens the file
+  if(!indata) { // file couldn't be opened
+      	cerr << "Error: file could not be opened" << endl;
+  }
+  indata >> degree >> cross_section;
+  while ( !indata.eof() ) 
+  { 
+	angle = degree*M_PI/180.0;
+    	gsl_histogram_accumulate (fH,angle,cross_section); // add value to histogram
+      	indata >> degree >> cross_section;
+  }
+  indata.close();
+   
+  // Create PDF from histogram
+  fP = gsl_histogram_pdf_alloc (n); // init PDF
+  gsl_histogram_pdf_init (fP,fH); // Make pdf with histogram dist.
+
+  gsl_histogram_free(fH); // free histogram ... tried to free pdf but didnt work CRH
+
+}
+  double StRNGangular_distribution_dpGSL::value () {
+  double RanNum =  gsl_ran_flat(fR->getr(),0,1);
+  double Val = gsl_histogram_pdf_sample (fP,RanNum);
+  
+  return Val; 
+}
+
+
+// ######################################################
+
+StRNGTwoNeutron_seqGSL::StRNGTwoNeutron_seqGSL(StGSLrng* rr, double par1, double par2,double par3,double par4,double par5,int par6,int beamA,int nNeut, int nProt) : fR(rr) {
+
+  n=100000; // Number of bins, no particular reason for 100000
+  fH = gsl_histogram_alloc (n); // define histo gram and alloc
+  fP = gsl_histogram_pdf_alloc (n); // init PDF
+
+  nlines = 0;
+  Q2N = par1;
+  WidthTotal = par2;
+  Width1 = par3;
+  Q1N = par4;
+  Width2 = par5;
+  AngMom = par6;
+  fragMass = beamA - nNeut - nProt - 2; //Final fragment A
+  SF1 = 1; //Spectroscopic factor for first neutron decay
+  SF2 = 1; //Spectoscopic factor for second neutron decay
+  hBarC = 197.3269631; // MeV fm
+  Nmass = 939.565346; //  MeV
+  amu = 931.494028; // from Nist
+  nucRad = 1.4; // fm from Lane and Thomas pg 266 *1.2*
+  redMass1 = (((Nmass/amu)*(fragMass+1))/(Nmass/amu + (fragMass+1)))*amu; // reduced mass from lane in amu
+  redMass2 = (((Nmass/amu)*fragMass)/(Nmass/amu + fragMass))*amu; // reduced mass from lane in amu
+  k1 = sqrt(2.0 * redMass1) / hBarC; // k in terms of sqrt(Energy)
+  k2 = sqrt(2.0 * redMass2) / hBarC; // k in terms of sqrt(Energy)
+  Radius1 = nucRad * (pow(fragMass+1,1.0/3.0) + pow(Nmass/amu, 1.0/3.0)); // Nuclear Radius (A1^(1/3) + A2^(1/3)) 
+  Radius2 = nucRad * (pow(fragMass,1.0/3.0) + pow(Nmass/amu, 1.0/3.0)); // Nuclear Radius (A1^(1/3) + A2^(1/3)) 
+
+  double En = Q2N; 
+  double IntSum = 0;
+
+  for(int m = 1; m < 10001; m++) {
+
+    double UmA=m*0.001; // Convert bins to energy in MeV
+    double UmB=(m+1)*0.001; // Convert bins to energy in MeV
+
+    if (En - UmB > 0){
+      double y1A = k1*Radius1*sqrt(En-UmA); // X = k*R with energy included
+      double jl1A = y1A * gsl_sf_bessel_jl (AngMom,y1A); // Regular Spherical Bessel * x
+      double nl1A = y1A * gsl_sf_bessel_yl (AngMom,y1A); // Irregular Spherical Bessel * x
+      double PenL1A = y1A / (nl1A*nl1A + jl1A*jl1A); // Penetrability as a function of E,W,L 
+     
+      double y2A = k2*Radius2*sqrt(UmA); // X = k*R with energy included
+      double jl2A = y2A * gsl_sf_bessel_jl (AngMom,y2A); // Regular Spherical Bessel * x
+      double nl2A = y2A * gsl_sf_bessel_yl (AngMom,y2A); // Irregular Spherical Bessel * x
+      double PenL2A = y2A / (nl2A*nl2A + jl2A*jl2A); // Penetrability as a function of E,W,L
+
+      double y1B = k1*Radius1*sqrt(En-UmB); // X = k*R with energy included
+      double jl1B = y1B * gsl_sf_bessel_jl (AngMom,y1B); // Regular Spherical Bessel * x
+      double nl1B = y1B * gsl_sf_bessel_yl (AngMom,y1B); // Irregular Spherical Bessel * x
+      double PenL1B = y1B / (nl1B*nl1B + jl1B*jl1B); // Penetrability as a function of E,W,L 
+
+      double y2B = k2*Radius2*sqrt(UmB); // X = k*R with energy included
+      double jl2B = y2B * gsl_sf_bessel_jl (AngMom,y2B); // Regular Spherical Bessel * x
+      double nl2B = y2B * gsl_sf_bessel_yl (AngMom,y2B); // Irregular Spherical Bessel * x
+      double PenL2B = y2B / (nl2B*nl2B + jl2B*jl2B); // Penetrability as a function of E,W,L
+
+      double functionatA = PenL1A*PenL2A/(pow(UmA-Q1N,2)+pow(Width2,4)*pow(SF2,4)*pow(PenL2A,2));
+      double functionatB = PenL1B*PenL2B/(pow(UmB-Q1N,2)+pow(Width2,4)*pow(SF2,4)*pow(PenL2B,2));
+      IntSum = IntSum + .0005*(functionatA + functionatB);
+    } 
+
+  }
+
+  double NormalizeInt = WidthTotal/IntSum;
+
+  for(int n=1; n < 10001; n++) {
+
+    double En=n*0.001; // Convert bins to energy in MeV
+    double IntSum=0;
+
+    for(int m = 1; m < 10001; m++) {
+
+      double UmA = m*0.001; // Convert bins to energy in MeV
+      double UmB = (m+1)*0.001; // Convert bins to energy in MeV
+
+      if (En - UmB > 0){
+	double y1A = k1*Radius1*sqrt(En-UmA); // X = k*R with energy included
+	double jl1A = y1A * gsl_sf_bessel_jl (AngMom,y1A); // Regular Spherical Bessel * x
+	double nl1A = y1A * gsl_sf_bessel_yl (AngMom,y1A); // Irregular Spherical Bessel * x
+	double PenL1A = y1A / (nl1A*nl1A + jl1A*jl1A); // Penetrability as a function of E,W,L 
+     
+	double y2A = k2*Radius2*sqrt(UmA); // X = k*R with energy included
+	double jl2A = y2A * gsl_sf_bessel_jl (AngMom,y2A); // Regular Spherical Bessel * x
+	double nl2A = y2A * gsl_sf_bessel_yl (AngMom,y2A); // Irregular Spherical Bessel * x
+	double PenL2A = y2A / (nl2A*nl2A + jl2A*jl2A); // Penetrability as a function of E,W,L
+
+	double y1B = k1*Radius1*sqrt(En-UmB); // X = k*R with energy included
+	double jl1B = y1B * gsl_sf_bessel_jl (AngMom,y1B); // Regular Spherical Bessel * x
+	double nl1B = y1B * gsl_sf_bessel_yl (AngMom,y1B); // Irregular Spherical Bessel * x
+	double PenL1B = y1B / (nl1B*nl1B + jl1B*jl1B); // Penetrability as a function of E,W,L 
+
+	double y2B = k2*Radius2*sqrt(UmB); // X = k*R with energy included
+	double jl2B = y2B * gsl_sf_bessel_jl (AngMom,y2B); // Regular Spherical Bessel * x
+	double nl2B = y2B * gsl_sf_bessel_yl (AngMom,y2B); // Irregular Spherical Bessel * x
+	double PenL2B = y2B / (nl2B*nl2B + jl2B*jl2B); // Penetrability as a function of E,W,L
+
+	double functionatA = PenL1A*PenL2A/(pow(UmA-Q1N,2)+pow(Width2,4)*pow(SF2,4)*pow(PenL2A,2));
+	double functionatB = PenL1B*PenL2B/(pow(UmB-Q1N,2)+pow(Width2,4)*pow(SF2,4)*pow(PenL2B,2));
+	IntSum = IntSum + .0005*(functionatA + functionatB);
+
+      } 
+    }
+
+    x[n]= IntSum*NormalizeInt; // Add value to array
+  }
+
+}
+double StRNGTwoNeutron_seqGSL::value () {return value(fLower, fUpper);}
+double StRNGTwoNeutron_seqGSL::value (double l, double u) {
+
+  // Create histogram to be filled with distribution
+  double a = 0.0, b = 10.0; //Range in MeV, can be expanded if need be  
+  gsl_histogram_set_ranges_uniform (fH, a, b); // set range and bins
+  double y[10001] = {0.0}; // Array to hold function
+      
+  // Create the Two Neutron function //    
+  for(int i = 1; i < 10001; i++) {
+    double En=i*0.001; // Convert bins to energy in MeV
+
+    if (En - u > 0){
+
+      double y1 = k1*Radius1*sqrt(En-u); // X = k*R with energy included
+      double jl1 = y1 * gsl_sf_bessel_jl (AngMom,y1); // Regular Spherical Bessel * x
+      double nl1 = y1 * gsl_sf_bessel_yl (AngMom,y1); // Irregular Spherical Bessel * x
+      double PenL1 = y1 / (nl1*nl1 + jl1*jl1); // Penetrability as a function of E,W,L 
+
+      double y2 = k2*Radius2*sqrt(u); // X = k*R with energy included
+      double jl2 = y2 * gsl_sf_bessel_jl (AngMom,y2); // Regular Spherical Bessel * x
+      double nl2 = y2 * gsl_sf_bessel_yl (AngMom,y2); // Irregular Spherical Bessel * x
+      double PenL2 = y2 / (nl2*nl2 + jl2*jl2); // Penetrability as a function of E,W,L
+
+      double Gamma2 = 2*SF2*SF2*Width2*Width2*PenL2;
+      double DS = (1/6.28318531) * Gamma2 / ((Q1N - u)*(Q1N - u ) + Gamma2*Gamma2/4.0); // Density of States
+      double Width = x[i];
+
+      double GammaOne = 2*SF1*SF1*Width1*Width1*PenL1*DS;
+      double omgplzwork = GammaOne/((Q2N - En)*(Q2N - En) + Width*Width/4.0);
+
+      y[i]=omgplzwork; // Add value to array
+
+    } else {
+      y[i] = 0; // Add value to array
+    }
+    gsl_histogram_accumulate (fH,En,y[i]); // add value to histogram
+  }
+    
+  gsl_histogram_pdf_init (fP,fH); // Make pdf with histogram dist.   
+
+  double RanNum =  gsl_ran_flat(fR->getr(),0,1);
+  double Val = gsl_histogram_pdf_sample (fP,RanNum);
+
+  return Val; 
+}
+
+// ######################################################
+//---------------Start of Volya 2n Seq decay--------------------------------------
+StRNGVolya_2nseqGSL::StRNGVolya_2nseqGSL(StGSLrng* rr, double par1, double par2,double par3,double par4,int par6, double par7, int fragA) : fR(rr), fR2(rr) {
+
+  //public variable
+  fInitialStateEnergy = par1;
+
+  //Parameters for Volya calculations
+  //Set Paramaters
+  double FragA = fragA - 2; //remove 2 neutrons
+  int L = par6;        //angular momentum
+  double Ei = par1; //MeV Initial State
+  //double S = par2;  //MeV Threshold
+  //double Ev = Ei+S;  //MeV intermediate state
+
+  //Set  so par2 is intermediate state, if Ev < 0 then it is assumed to be scattering length for L=0 decay
+  double Ev = par2;  //MeV intermediate state
+  double S = Ev - Ei;  //MeV Threshold
+
+  double sI = par3; //spectroscopic factor for the I->V single particle decay
+  double sV = par4; //  ''                         V->F       ''
+  printf("Inside StRNGVolya_2nseqGSL: Ei:%f L:%d S:%f Ev:%f sI:%f sV:%f GammaIn:%f FragA:%f\n",Ei,L,S,Ev,sI,sV,par7,FragA);
+  
+
+  //NewParameter for addition of BW
+  Double_t Gamma_in = par7;
+
+
+ //-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+  //   For L=0 seq. decays need to re-calcualte Ev such that virtual state 
+  //   (based on s-wave scattering length is correcly calculated with no R dependence
+  //   So, we need to calculated a new Ev that corresponds to the correct virtual state 
+  //   of the input Ev above.  First lets set the current Ev to the desired Evirt;
+  if(Ev<0 && L!=0) cerr << " EV CANNOT BE NEGATIVE WITH L!=0 !!!!!!!!" << endl;
+  if(L==0){
+    Double_t Evirt = Ev;
+    //Now calculate the scattering length corresponding to the virtual state
+    Double_t redMass = 931.494 * ((1.008 * (FragA)) / (1.008 + (FragA)));  //MeV/c2    
+    Double_t as = sqrt( (197.3269*197.3269) / (2*redMass * Evirt) );
+
+    bool Input_as = false;
+    if(Ev < 0){
+      as = -Ev;
+      Evirt = (197.3269*197.3269) / (2*redMass * as*as);
+      Input_as = true;
+    }
+    
+    //Next we can determine the energy of the intermiedate state (Ev) from the
+    //scattering length based on the scattering length of a Breit-Wigner
+    Double_t R = 1.4 * (TMath::Power(1.008, 1./3.)+TMath::Power(FragA,1./3.)); //fm
+    Ev = (197.3269*197.3269) / (redMass*R*as);
+
+    printf("  L=0 requires re-calculation of intermiediate state\n");
+    if(Input_as){
+      printf("  Input Scattering Length of Intermiedate State: -%f fm\n",as);
+      printf("  Corresponding Virtual State: %f MeV \n",Evirt);
+    }else{
+      printf("  Input Virtual State: %f MeV\n", Evirt);
+      printf("  Corresponding Scattering Length: -%f fm\n",as);
+    }
+    printf("  Ev used for calcualtion is: %f MeV\n",Ev);
+  }
+
+  //-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+
+
+  const Int_t nSteps = 6000;
+  Double_t min=0, max = 10.;
+  Double_t stepsize = (max-min) / nSteps;
+  printf("nSteps:%d  stepsize:%f  Range:0-%f MeV\n\n",nSteps,stepsize,stepsize*nSteps);
+
+  if((1.5*Ei) > max) cerr << "\n\nNeed to increase maxbin in StRNGVolya_2nseqGSL\n" << endl;
+
+
+  //Initialize the hists and pdfs.
+  fH2d = gsl_histogram2d_alloc (nSteps,nSteps); // define histo gram and alloc
+  gsl_histogram2d_set_ranges_uniform (fH2d, min, max, min, max); // set range and bins
+  fP2d = gsl_histogram2d_pdf_alloc (nSteps,nSteps); // init PDF
+
+
+  //Loop of BW
+  for(int j=0; j<nSteps; j++){
+    if((j%500)==0) cout << "Creating 2-D PDF for Volya+BW distribution.  Step: " <<  j << " of " << nSteps <<  endl;
+    Double_t Ebw0 = j*stepsize;
+    Double_t Ebw1 = (j+1)*stepsize;
+    //Evaluate at midpoint
+    Double_t Ebw = (Ebw0+Ebw1)/2.;
+    
+    Double_t DecayRateArray[nSteps]={0}; 
+    Double_t Total2nDecayWidth = 0;
+    //Loop over Erel
+    for(int i=0; i<nSteps; i++){
+      Double_t Er0 = i*stepsize;  //Relative energy of e and e' (2 neutrons)
+      Double_t Er1 = (i+1)*stepsize;  //Relative energy of e and e' (2 neutrons)
+      //Evaluate at midpoint
+      Double_t Er = (Er1+Er0)/2.;
+
+      Double_t e = 0.5 * (Ebw +Er);
+      Double_t ep = 0.5 * (Ebw -Er);
+
+      //Reset Threshold to keep the intermediate state at a constant energy.
+      S = Ev - Ebw;
+
+      Double_t DecayRate = -1;
+      if(Er<=Ebw) DecayRate = GetDecayRate(L,Ebw, S, Ev, Er, e, ep, sI,sV, FragA);
+      else DecayRate = 0;
+      DecayRate = DecayRate * stepsize;
+
+      DecayRateArray[i] = DecayRate;
+      Total2nDecayWidth = Total2nDecayWidth + DecayRate;
+    }//i Erel   
+
+    Double_t Gamma_Total = Total2nDecayWidth + Gamma_in;
+
+    Double_t BW = Gamma_in / ( TMath::Power(Ebw - Ei,2.0) + 0.25*TMath::Power(Gamma_Total,2.0));
+    BW = BW * stepsize;
+
+    //loop again to calc prob for each erel of each Ebw
+    for(int i=0; i<nSteps; i++){
+      Double_t Er0 = i*stepsize;  //Relative energy of e and e' (2 neutrons)
+      Double_t Er1 = (i+1)*stepsize;  //Relative energy of e and e' (2 neutrons)
+      //Evaluate at midpoint
+      Double_t Er = (Er1+Er0)/2.;
+      
+      Double_t Prob = BW * DecayRateArray[i];
+
+      //FILL HISTOGRAM FOR THE 2D PDF
+      gsl_histogram2d_accumulate(fH2d, Ebw, Er, Prob);
+
+    }//i second loop
+
+  }//j Ebw
+
+  
+  //CREATE 2-D PDF
+  gsl_histogram2d_pdf_init(fP2d, fH2d);
+  
+}
+
+
+
+
+//__________________________________________________________________________________
+double StRNGVolya_2nseqGSL::GetDecayRate(int L, double Ei, double S, double Ev, double Er, double e, double ep, double sI, double sV, double fragA){
+
+  double DR = 1./(8*TMath::Pi());
+  DR = DR * SPDW(e,L,fragA,1) * SPDW(ep,L,fragA,0);
+
+  double A = Ei+2*S;
+  double B = 0.5 * ( Gamma(e,L,fragA,1,sV) + Gamma(ep,L,fragA,0,sV) );
+
+  //Numerator is now A - iB
+
+  double C = S + e;
+  double D = 0.5 * Gamma(ep,L,fragA,1,sV);
+
+  double X = S + ep;
+  double Y = 0.5 * Gamma(e,L,fragA,0,sV);
+
+  //Denominator is now [C-iD] [X-iY]
+  //Complex Modulus gives:
+  //            sqrt(A^2 + B^2)
+  //       -------------------------
+  //       sqrt(C^2+D^2)*sqrt(X^2+Y^2)
+  //
+  //and then square everything and remove the sqrts
+
+  double modsq = (A*A + B*B) / ( (C*C + D*D) * (X*X + Y*Y) );
+
+  DR = DR * modsq;
+
+  DR = DR * sI * sV;
+
+  return DR;
+}
+
+double StRNGVolya_2nseqGSL::Gamma(double ee, int L, double fragA, int add, double S){
+
+  double gamma = SPDW(ee,L,fragA,add) * S;
+
+  //Add small const. to gamma for L>0 to account for a mathematical singularity that can occur,
+  //which then leads to some unrealistic distributions.
+  if(L>0) gamma = gamma + 0.001;
+
+  return gamma;
+}
+
+
+//____Single Particle Decay Width_______________
+double StRNGVolya_2nseqGSL::SPDW(double ee, int L, double fragA, int add){
+
+  //TODO: should have 2 reduced masses? for fragA and fragA+1
+  double redMass = 931.494 * ((1.008 * (fragA+add)) / (1.008 + (fragA+add)));  //MeV/c2
+  double hbarC = 197.3269; //MeV fm
+  double R = 1.4 * (TMath::Power(1.008, 1./3.)+TMath::Power(fragA+add,1./3.)); //fm
+
+  double k = TMath::Sqrt(2*redMass*ee) / hbarC;
+
+  double spdw = 2*hbarC*hbarC / (redMass*R*R);
+
+  spdw = spdw * k * R * TMath::Abs( (2.*L-1.)/(2.*L+1.) );
+
+  double transProb = 0;
+  if(L==0) transProb = 1;
+  else if(L==1) transProb = TMath::Power(k*R, 2.0) / (1 + TMath::Power(k*R, 2.0));
+  else if(L==2) transProb = TMath::Power(k*R, 4.0) / (9 + 3*TMath::Power(k*R,2.0) + TMath::Power(k*R, 4.0));
+  else cerr << "Values of L=0,1,2 are only accepted at this time." << endl;
+  
+  spdw = spdw * transProb;
+  
+  return spdw;
+}
+
+
+
+double StRNGVolya_2nseqGSL::value () {return value(fLower, fUpper);}
+double StRNGVolya_2nseqGSL::value (double l, double u) {
+
+  double RanNum =  gsl_ran_flat(fR->getr(),0,1);
+  double Val = gsl_histogram_pdf_sample (fP,RanNum);
+
+  return Val; 
+}
+void StRNGVolya_2nseqGSL::value2d (double &En, double &Erel) {
+
+  double RanNum =  gsl_ran_flat(fR->getr(),0,1);
+  double RanNum2 =  gsl_ran_flat(fR2->getr(),0,1);
+   
+  double ebw, ereln;
+  gsl_histogram2d_pdf_sample(fP2d, RanNum, RanNum2, &ebw, &ereln);
+
+  En = ebw;
+  Erel = ereln;
+}
+//-------------------------------End of Volya 2n Seq. decay--------------------------------------------
+
+
+// ######################################################
+//---------------Start of Volya Dineutron decay--------------------------------------
+StRNGVolya_DineutronGSL::StRNGVolya_DineutronGSL(StGSLrng* rr, double par1, double par2,double par3, int fragA) : fR(rr), fR2(rr) {
+
+  //Set Paramaters
+  Double_t FragA = fragA - 2; //Residual fragments after dineutron decay
+  Double_t Ei = par1; //MeV Initial State
+  Double_t as = par3; //n-n scattering length (fm)
+
+  //NewParameter for addition of BW
+  Double_t Gamma_in = par2;
+
+  //Constants
+  Double_t r0 = 1.4; //fm
+  //Double_t RR = r0 * pow(FragA + 2, 0.333333); //fm
+  Double_t RR = r0 *( pow(FragA, 0.333333) + pow(2, 0.333333));
+
+  const Int_t nSteps = 6000;
+  Double_t min=0, max = 10.;
+  Double_t stepsize = (max-min) / nSteps;
+
+  printf("Inside StRNGVolya_Dineutron: Ei:%f GammaIn:%f as:%f FragA:%f\n",Ei,Gamma_in,as,FragA);
+  printf("  nSteps:%d  stepsize:%f  Range:0-%f MeV\n\n",nSteps,stepsize,stepsize*nSteps);
+
+  if((1.5*Ei) > max) cerr << "\n\nNeed to increase maxbin in StRNGVolya_2nseqGSL\n" << endl;
+
+  //Initialize the hists and pdfs.
+  fH2d = gsl_histogram2d_alloc (nSteps,nSteps); // define histo gram and alloc
+  gsl_histogram2d_set_ranges_uniform (fH2d, min, max, min, max); // set range and bins
+  fP2d = gsl_histogram2d_pdf_alloc (nSteps,nSteps); // init PDF
+
+
+  //Loop of BW
+  for(int j=0; j<nSteps; j++){
+    if((j%500)==0) cout << "Creating 2-D PDF for Volya+BW distribution.  Step: " <<  j << " of " << nSteps <<  endl;
+    Double_t Ebw0 = j*stepsize;
+    Double_t Ebw1 = (j+1)*stepsize;
+    //Evaluate at midpoint
+    Double_t Ebw = (Ebw0+Ebw1)/2.;
+    
+    Double_t DecayRateArray[nSteps]={0}; 
+    Double_t Total2nDecayWidth = 0;
+    //Loop over Erel
+    for(int i=0; i<nSteps; i++){
+      Double_t di_ei0 = i*stepsize;  //intrinsic energy of the dineutron
+      Double_t di_ei1 = (i+1)*stepsize; 
+      //Evaluate at midpoint
+      Double_t di_ei = (di_ei1+di_ei0)/2.;
+      
+      Double_t DecayRate = -1;
+      if(di_ei<=Ebw) DecayRate = GetDineutronDecayRate(FragA,Ebw, di_ei, r0, RR, as);
+      else DecayRate = 0;
+      DecayRate = DecayRate * stepsize;
+
+      DecayRateArray[i] = DecayRate;
+      Total2nDecayWidth = Total2nDecayWidth + DecayRate;
+    }//i Erel   
+
+    Double_t Gamma_Total = Total2nDecayWidth + Gamma_in;
+
+    Double_t BW = Gamma_in / ( TMath::Power(Ebw - Ei,2.0) + 0.25*TMath::Power(Gamma_Total,2.0));
+    BW = BW * stepsize;
+
+    //loop again to calc prob for each erel of each Ebw
+    for(int i=0; i<nSteps; i++){
+      Double_t di_ei0 = i*stepsize;  //intrinsic energy of the dineutron
+      Double_t di_ei1 = (i+1)*stepsize; 
+      //Evaluate at midpoint
+      Double_t di_ei = (di_ei1+di_ei0)/2.;
+
+      Double_t Prob = BW * DecayRateArray[i];
+      
+      Double_t di_ek = Ebw - di_ei; //kinetic energy of dineutron   
+
+      //FILL HISTOGRAM FOR THE 2D PDF
+      gsl_histogram2d_accumulate(fH2d, di_ei, di_ek, Prob);
+
+    }//i second loop
+
+  }//j Ebw
+
+  
+  //CREATE 2-D PDF
+  gsl_histogram2d_pdf_init(fP2d, fH2d);
+  
+}
+
+
+
+
+//__________________________________________________________________________________
+double StRNGVolya_DineutronGSL::GetDineutronDecayRate(Double_t FragA, Double_t Ebw, Double_t di_ei, Double_t r0, Double_t RR, Double_t as){
+
+  Double_t redMass = 931.494 * ((1.008*1.008) / (1.008 + 1.008)); //Reduced dineutron mass
+
+  Double_t epsilon0 = (197*197) / (2*redMass*as*as); //MeV
+
+  Double_t term1 = sqrt( (Ebw - di_ei)*di_ei );
+  
+  Double_t term2 = 1 + ( (r0*di_ei) / (2*as*epsilon0) );
+
+  term2 = term2*term2*epsilon0 + di_ei;
+
+  Double_t DR = (1./TMath::Pi()) * (term1 / term2) * (r0 / RR);
+
+  return DR;
+}
+
+
+double StRNGVolya_DineutronGSL::value () {return value(fLower, fUpper);}
+double StRNGVolya_DineutronGSL::value (double l, double u) {
+
+  double RanNum =  gsl_ran_flat(fR->getr(),0,1);
+  double Val = gsl_histogram_pdf_sample (fP,RanNum);
+
+  return Val; 
+}
+void StRNGVolya_DineutronGSL::value2d (double &di_ei, double &di_ek) {
+
+  double RanNum =  gsl_ran_flat(fR->getr(),0,1);
+  double RanNum2 =  gsl_ran_flat(fR2->getr(),0,1);
+   
+  double EI, EK;
+  gsl_histogram2d_pdf_sample(fP2d, RanNum, RanNum2, &EI, &EK);
+
+  di_ei = EI;
+  di_ek = EK;
+}
+//-------------------------------End of Volya 2n Seq. decay--------------------------------------------
+
+
+//added by SMM on 10/16/06 for custom excitation energy lineshape
+//new modification by zwk 11/11 to speed things up.  Create a TH1F and then sample that rather than
+//reading the input file everytime you want a value.
+StRNGCustomGSL::StRNGCustomGSL(StGSLrng* rr, std::string fnme) : fR(rr) {
+  fname = fnme;
+  cout << "Custom Line Shape chosen from file: " << fname << endl;
+ 
+  std::ifstream in;
+  in.open(fname.c_str());
+  if(!in.is_open()) cerr << "Custom Line Shape File is NOT OPEN: " << fname << endl;
+
+  TGraph *tempG = new TGraph();
+  
+  Double_t firstPoint = 0;
+  Double_t lastPoint = 0;
+  Int_t np=0;
+  while(1) {
+    Double_t eee, xs;
+    in >> eee >> xs;
+    tempG->SetPoint(np,eee,xs);
+    if(np==0) firstPoint = eee;
+    lastPoint = eee;
+    //if(eee > lastPoint) lastPoint = eee;
+    np++;
+    if (in.eof()) break;
+  }
+
+
+  if(lastPoint<firstPoint){
+    double temp = lastPoint;
+    lastPoint = firstPoint;
+    firstPoint = temp;
+  }
+
+  TUUID *time = new TUUID();
+  TString name = Form("th1f_lineshape_%s_%s",time->AsString(),fname.c_str());
+  cout << name << endl;
+  cout << "  LineShape starts at E = " << firstPoint << " and ends at E = " << lastPoint << " MeV" << endl;
+
+  Int_t nbins = 10000;
+  Int_t bin1 = firstPoint -1;
+  Int_t bin2 = lastPoint + 1;
+  customLinePdf = new TH1F(name,name,nbins,bin1,bin2);
+
+  //Fill th1f from tgraph
+  //start at i=1 (i=0 is underflow)
+  for(int i=1; i<nbins; i++){
+    Double_t binC = customLinePdf->GetBinCenter(i);
+    if(binC > lastPoint) break;
+    Double_t val = tempG->Eval(binC);
+    customLinePdf->SetBinContent(i,val);
+  }
+
+
+}
+
+double StRNGCustomGSL::value() {
+
+  return customLinePdf->GetRandom();
+
+}
+
+
+/*//added by SMM on 10/16/06 for custom excitation energy lineshape
+StRNGCustomGSL::StRNGCustomGSL(StGSLrng* rr, std::string fnme) : fR(rr) {
+  fname = fnme;
+  cout << "Custom Line Shape chosen from file: " << fname << endl;
+}
+
+double StRNGCustomGSL::value() {
+
+  std::ifstream in;
+  in.open(fname.c_str());
+
+  //find number of lines in the file (nlines)
+  int nlines = 0;
+  double temp; //dummy variable 
+  while(1) {
+    in >> temp >> temp;
+    if (!in.good()) break;
+    nlines++;
+  }
+  //std::cout << "My number of lines is " << nlines << "\n";
+
+  //"reset" the file
+  in.clear();
+  in.seekg(0);
+
+  int nbins = nlines; //start thinking in terms of bins
+
+  //create array of  and y variables with nbins positions
+  double xxx[nbins], yyy[nbins];
+
+  //read in x and y values and put them into an array.  
+  int line=0;
+  while(line < nlines) {
+    in >> xxx[line] >> yyy[line];
+    //std::cout << "My current line is " << line << "\n";
+    //std::cout << "My x and y vals are: " << xxx[line] << " " << yyy[line] << "\n";
+    if (!in.good()) break;
+    line++;
+  }
+
+  // done with the datfile, close it
+  in.close();
+
+
+
+  //convert x values into left and right edges of the bin.
+  double ysum = 0;
+  double xlo[nbins], xhi[nbins], prcnt[nbins], ynorm[nbins];
+  double lodiff, hidiff;
+  for(int i=1; i<(nbins-1); i++) {
+
+    lodiff = (xxx[i] - xxx[i-1]); //get difference between
+    hidiff = (xxx[i+1] - xxx[i]); //bins below & above
+
+    xlo[i] = xxx[i]-(lodiff/2); //set bin edges equal to
+    xhi[i] = xxx[i]+(hidiff/2); //center +/- difference / 2
+
+    ysum += yyy[i]; //while we're at it get a sum of y bins
+    prcnt[i]=0;     //and set all prcnt[i] values to 0.
+  }
+
+  //set first and last bins manually
+  xlo[0] = xxx[0];
+  xhi[0] = xlo[1];
+  xlo[nbins-1] = xhi[nbins-2];
+  xhi[nbins-1] = xxx[nbins-1];
+
+  //add in the first and last bins to ysum
+  ysum += yyy[0];
+  ysum += yyy[nbins-1];
+
+
+  for (int i=0; i<nbins; i++) {
+    
+    //normalize y values
+    ynorm[i] = yyy[i]/ysum;
+    
+    //set prcnt[i] to normalized y-value 
+    //plus all others before it
+    for (int j=0; j<=i ; j++) {
+      prcnt[i]+=ynorm[j];
+    }
+  }
+
+  
+  //  for(int i=0; i<nbins; i++) {
+  //     for (int j=0; j<=i ; j++) {
+  //       prcnt[i]+=ynorm[j];
+  //     }
+  //   }
+  
+
+  //rng from 0 to 1 to select which bin we are in
+  double ran_prcnt = gsl_rng_uniform(fR->getr()); 
+
+  int bin = 0;   //variable to denote the bin we fill
+  
+  if (ran_prcnt == 0) { 
+    bin = 0; //if rng returns 0, set bin to bin 0
+
+  } else { //otherwise, set bin to the bin that ran_prcnt falls into
+
+    for (int i=0; i<300; i++) {
+      if (ran_prcnt <= prcnt[i] && ran_prcnt > prcnt [i-1]) {
+	bin = i;
+      } else {}
+    }
+  }
+
+  //return a random number between the lower and upper edges of the bin
+  return gsl_ran_flat(fR->getr(), xlo[bin], xhi[bin]);
+
+}
+*/
+
+
+///-------------SWAVE Line Shape----------------------------
+//Added by JKS on 11 July 2011
+double
+swavefct::operator() (double* x, double* par)
+{
+  /*
+    double
+    StRNGswave::swave(double *x,double *par)*/
+  // see SMM logbook fri 2/25/11 to see where this formula comes from
+  /*double hbar = 6.5821; //hbar in fun units with powers pre-cancelled
+  double mu = 1.0432;   // mass of neutron in MeV/c^2 with c division and powers pre-done
+  double k = sqrt(2.0*mu*x[0])/hbar; // wave number
+  //change zwk 11/28/11 such that input is no longer gamma but rather the neutron seperation energy of projectile (MeV)
+  //double gamma = par[0];
+  double gamma = sqrt(2*par[0]*939.565)/197.0;
+  double scatlen = par[1];
+  double val = k*pow(1.0/(gamma*gamma + k*k),2)*pow(cos(k*scatlen) - (gamma/k)*sin(k*scatlen),2);
+    //_-----------------------------------------------------------------------
+    // 
+  */
+
+
+  //change hbar and mu parameterization to be consistent with zwk below  
+  //double hbar = 6.5821; //hbar in fun units with powers pre-cancelled
+  //  double mu = 1.0432;   // mass of neutron in MeV/c^2 with c division and powers pre-done
+  //  double k = sqrt(2.0*mu*x[0])/hbar; // wave number
+  double k = sqrt(2.0*x[0]*939.56532)/197.327; // wave number
+  //change zwk 11/28/11 such that input is no longer gamma but rather the neutron seperation energy of projectile (MeV)
+  //double gamma = par[0];
+  double gamma = sqrt(2*par[0]*939.56532)/197.327;
+  double scatlen = par[1];
+  // implement Aksyutina (PLB666(2008)430) parameterization
+  //  double val = k*pow(1.0/(gamma*gamma + k*k),2)*pow(cos(k*scatlen) - (gamma/k)*sin(k*scatlen),2);
+  double phaseshift = atan(1/(3*k/2-1/scatlen/k));
+  double val = k*pow(1.0/(gamma*gamma + k*k),2)*pow(cos(phaseshift) + (gamma/k)*sin(phaseshift),2); 
+  
+  return val;
+}
+
+StRNGswave::StRNGswave(StGSLrng* rr, double gamma, double scatlen)
+{
+  printf("Inside StRngswave: B.E.=%f  scatlen=%f\n",gamma,scatlen);
+
+  swavefct* swave = new swavefct();
+
+  //Need unique name for each TF1 in order to use multiple s-wave lineshapes in 3-body decay (aka di-neutron ....)
+  TUUID *time = new TUUID();
+  TString name = Form("swave_%s",time->AsString());
+  cout << name << endl;
+
+  swavePdf = new TF1(name.Data(),swave,0.,10.,2);
+  swavePdf->SetParameters(gamma,scatlen);
+  swavePdf->SetNpx(1000);
+
+  //Find the first minimum of the function and cut off oscillitory behavior there. - JKS
+  double hbar = 6.5821; //hbar in fun units with powers pre-cancelled
+  double mu = 1.0432;   // mass of neutron in MeV/c^2 with c division and powers pre-done
+  double pi = 3.141519;
+  double limit1, limit2, min;
+/*
+  //Approximate starting value for min
+  //Empirically observed that in kspace, minima occur roughly every pi/(a-0.5). Must be converted to xspace. - JKS
+  min = pow(pi*hbar/(scatlen-0.5),2)/(2*mu);
+  limit1 = 0.5*min;
+  limit2 = 1.5*min;
+  min = swavePdf->GetMinimumX(limit1,limit2);
+  min = std::min(min,10.);
+  swavePdf->SetRange(0,min);
+*/
+  swavePdf->SetRange(0,10.);
+}
+
+double
+StRNGswave::value()
+{
+  return swavePdf->GetRandom();
+}

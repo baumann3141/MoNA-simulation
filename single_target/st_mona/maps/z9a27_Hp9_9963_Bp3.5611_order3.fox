@@ -1,0 +1,113 @@
+INCLUDE '/projects/sweeper/cosy/source/ver8.1/COSY' ;
+
+  PROCEDURE READBFILE UNIT BY IXMAX IZMAX DELTAX DELTAZ;
+    VARIABLE STR 80 ; VARIABLE BLANK 1 ;
+    VARIABLE FIRST 1 ; VARIABLE LAST 1 ;
+    VARIABLE LINES 1 ; VARIABLE L 1 ; VARIABLE DATAPERLINE  1 ; VARIABLE DL 1 ;
+    VARIABLE IX 1 ; VARIABLE IZ 1 ;
+    BLANK := ' ' ;
+
+    READ UNIT STR ;
+    FIRST := 1 ; LAST := 1 ;
+    WHILE SS(STR, LAST, LAST)#BLANK ; LAST := LAST + 1 ; ENDWHILE ;
+    LINES := R(STR, FIRST, LAST) ;
+    LAST := LAST + 1 ; FIRST := LAST ;
+    WHILE SS(STR, LAST, LAST)#BLANK ; LAST := LAST + 1 ; ENDWHILE ;
+    DATAPERLINE := R(STR, FIRST, LAST) ;
+
+    READ UNIT STR ;
+    FIRST := 1 ; LAST := 1 ;
+    WHILE SS(STR, LAST, LAST)#BLANK ; LAST := LAST + 1 ; ENDWHILE ;
+    IXMAX := R(STR, FIRST, LAST) ;
+    
+    LAST := LAST + 1 ; FIRST := LAST ;
+    WHILE SS(STR, LAST, LAST)#BLANK ; LAST := LAST + 1 ; ENDWHILE ;
+    IZMAX := R(STR, FIRST, LAST) ;
+
+    READ UNIT STR ;
+    FIRST := 1 ; LAST := 1 ;
+    WHILE SS(STR, LAST, LAST)#BLANK ; LAST := LAST + 1 ; ENDWHILE ;
+    DELTAX := R(STR, FIRST, LAST) ;
+    
+    LAST := LAST + 1 ; FIRST := LAST ;
+    WHILE SS(STR, LAST, LAST)#BLANK ; LAST := LAST + 1 ; ENDWHILE ;
+    DELTAZ := R(STR, FIRST, LAST) ;
+
+    IX := 1 ; IZ := 1 ;
+    LOOP L 1 LINES ;
+      READ UNIT STR ;
+      FIRST := 1 ; LAST := 1 ;
+      LOOP DL 1 DATAPERLINE ;
+        WHILE SS(STR, LAST, LAST)#BLANK ; LAST := LAST + 1 ; ENDWHILE ;
+        BY(IX,IZ) := R(STR, FIRST, LAST) ;
+        LAST := LAST + 1 ; FIRST := LAST ;
+        IF IX=IXMAX ; IX := 1 ; IZ := IZ + 1 ;
+        ELSEIF IX#IXMAX ; IX := IX + 1 ;
+        ENDIF ;
+      ENDLOOP ;
+    ENDLOOP ;
+    
+  ENDPROCEDURE ;
+  
+  PROCEDURE SWEEPER B NX NZ DX DZ ;
+
+ MF  1.5791  B NX NZ DX DZ  1 0.14  0.50 0.0000  -0.3 ;
+  ENDPROCEDURE ;
+
+PROCEDURE RUN ;
+
+  VARIABLE BY 1 150 260 ;
+  VARIABLE NX 1 ; VARIABLE NZ 1 ; 
+  VARIABLE DELTAX 1 ; VARIABLE DELTAZ 1 ;
+  VARIABLE SWEEPERMAP 1000 8 ;
+  VARIABLE INV 1000 8 ;
+  VARIABLE RES 1 4 ; 
+  VARIABLE I 1 ;
+
+  OPENF 10 'COSYMap' 'UNKNOWN' ;
+  READBFILE 10 BY NX NZ DELTAX DELTAZ;
+  CLOSEF 10 ;
+  WRITE 6 'Read field map ...' ;
+  
+  
+ OV  3  3 0 ; 
+  RPR  3.5611 27 9 ;
+  SB 0.001 0.06 0 0.001 0.06 0 0 0.05 0 0 0 ;
+  CR ;
+  ER 1 3 1 3 1 5 1 1 ;
+  UM ;
+  BP ;
+
+
+{Sweeper only map has no triplet elements,just a drift length.}
+
+    DL 0.0749522 ;
+
+{Input what the present settings are for here:
+                ......
+
+ Also, input the name of the 2d midplane map you are using:
+             8_40455kG_05124.txt                 }
+
+  SWEEPER BY NX NZ DELTAX DELTAZ;
+  EP ;
+  SM SWEEPERMAP ;
+  PA 6 ;
+  RR SWEEPERMAP 0.001 0.06 0.001 0.06 0.05 0.001 0.0014 500 5 INV RES ;
+  OPENF 11 'sweeper.map' 'unknown' ;
+  PM 11 ;
+  CLOSEF 11 ;
+  OPENF 11 'sweeper.abr' 'unknown' ;
+  PA 11 ;
+  CLOSEF 11 ;
+  OPENF 11 'sweeper.inv' 'unknown' ;
+  LOOP I 1 4 ; WRITE 11 INV(I) ; ENDLOOP ;
+  CLOSEF 11 ;
+  WRITE 6 ' Resolution A: '&S(RES(1)) ;
+  WRITE 6 ' Resolution Y: '&S(RES(2)) ;
+  WRITE 6 ' Resolution B: '&S(RES(3)) ;
+  WRITE 6 ' Resolution D: '&S(RES(4)) ;
+
+ENDPROCEDURE ;
+RUN ;
+END ;

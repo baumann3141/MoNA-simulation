@@ -1,0 +1,197 @@
+// -*- mode: c -*-
+
+/** \mainpage Simple Track (st) --- simple particle tracking through beam line elements
+  
+
+\author Heiko Scheit
+This program does something...
+
+
+<h2>Contents</h2>
+- \ref intro
+- \ref sec_struc 
+- \ref sec_use_st_mona
+
+\section intro Introduction
+Simple Track (st) is a 2D simulation tracking particles through
+various beam line elements (BLE):
+    \f$x\f$, \f$\theta_x\f$, \f$y\f$, \f$\theta_y\f$ are
+      tracked as a function of the parameter \f$z\f$. 
+      \f$\theta_x\f$, \f$\theta_y\f$ are usually known as \f$\theta\f$ and \f$\phi\f$
+      by the beam physicist.  Here we use \f$\theta_x\f$ and \f$\theta_y\f$ for these
+      angles and \f$\theta\f$ and \f$\phi\f$ stand for the usual spherical co-ordinates.
+- z is tracking parameter (not time)
+   (at a certain step in the simulation all particles have the same z)
+
+Once a beam line element (BLE) is implemented it can easily be added at various places.
+
+\section sec_struc General structure of the Program
+- written in C++
+- provides a library to build a simulation
+- provided execuables are st (mainly for testing) and st_mona (for the MoNA-Sweeper setup)
+- future: beam line elements described by simple text-file
+
+\subsection subsec_ble       List of available BLEs
+- Drift in free space
+- Material (energy loss, straggling, charge state)
+    possibly with one or more reaction(s) (see \ref subsec_reac), which can:
+   - add, change, remove particles
+   - change momentum (vector) of particles.
+- (Cosy (Magnet)) Map}
+- ...
+
+\subsection subsec_particle  Particle
+The known particle properties
+- \f$A\f$, \f$Z\f$, \f$Q\f$, \f$m\f$   (particle ID)
+- \f$x\f$, \f$\theta_x\f$, \f$y\f$, \f$\theta_y\f$, \f$z\f$  (coordinates)
+- \f$E_{\mbox{\tiny kin}}\f$, \f$l\f$, \f$t\f$ (energy, path, time)
+
+are changed by a series of beam line elements (see \ref subsec_ble aaa).
+
+
+
+\subsection subsec_reac  Reaction
+Currently only one reaction is implemented:
+- removal of \f$n\f$ neutrons and \f$p\f$ protons and the subsequent 
+    isotropic emission of a neutron with a given energy distribution
+
+
+\section sec_use_st_mona User Manual for st_mona
+The program 'st_mona' is simulation of the mona setup.  To run it
+type 'st_mona' if it is in the path or '<path>/st_mona'.
+The command line switch -? shows the available options:
+\verbatim
+oyster> ./st_mona  -?
+
+Program Simple-Track (st)        Heiko Scheit (scheit@nscl.msu.edu)
+Compiled on Oct  2 2006 at 11:42:42.
+
+usage: 
+       
+ -v    Run verbose
+ -n    Set number of events
+ -f    Set output file name.  Extension ("root", "dat") determines file type.
+          root   -> ROOT file
+          gsltup -> GSL n-tuple (also a file *.gsltup.dsc is written, describing the columns)
+ -e    Set excitation energy model and parameters (MeV)
+         const   <energy>
+         uniform <e-low> <e-high>
+         therm   <temp>
+         gauss   <centr> <sigma>
+         bw      <centr> <gamma>
+ -be   Set beam energy per A
+ -bZ   Set beam Z
+ -bA   Set beam A
+ -dT   Set target thickness
+ -dbe  Set relative beam energy spread (sigma)
+ -rTx  Set resolution of target-x
+ -rt   Set time resolutions
+ -rxy  Set resolution of CRDC1 xy
+ -rth  Set resolution of CRDC1 theta xy
+ -rMx  Set resolution of MoNA X
+ -rMyz Switch MoNA Y and Z discretization on/off (1/0)
+ -strag scale
+ -glaub scale
+\endverbatim
+
+use
+\verbatim
+export GSL_RNG_SEED=9239237 
+\endverbatim
+to start simulation with another seed.  
+
+verbose output 
+\verbatim
+oyster> ./st_mona -v
+
+Program Simple-Track (st)        Heiko Scheit (scheit@nscl.msu.edu)
+Compiled on Oct  2 2006 at 13:47:30.
+
+Will simulate 1 events.
+Writing to file st_mona.root.
+      Excitation energy:  uniform 0 5
+               beam A-Z:   26-10 
+       target thickness:       722 mg/cm^2
+            beam energy:        86 MeV/u
+     beam energy spread:      0.03 
+    Angular strag scale:         1 
+     Glauber Kick scale:         1 
+Resolutions are:
+                   time:       0.1 ns 
+               Target x:    0.0007 m
+               CRDC1 XY:    0.0013 m
+            CRDC1 Theta:     0.001 rad
+                 MoNA X:      0.05 m
+MoNA bar (0/1 = no/yes):         1 
+I  st_mona.cc:278  (main) :: Writing data to ROOT tree in file st_mona.root
+
+
+Run number 0:
+#   Z   A   Q   ex       x      tx       y      ty         z    (g-1)u      Ekin      beta     gamma      Brho         P      path         t
+               MeV      mm    mrad      mm    mrad         m       MeV       MeV                            Tm     MeV/c         m        ns
+StPartInitSave
+0  10  26  10    0     0.0     0.0     0.0     0.0         0         0         0   0.00000   1.00000   0.00000         0         0         0
+StPartInitRandomGauss
+0  10  26  10    0     0.7    16.7    -1.1     1.1         0      88.6   2.3e+03   0.40758   1.09509   3.60576 1.081e+04         0         0
+Material
+0   8  23   8    0     0.7     5.3    -1.1    -2.4         0      72.2  1.66e+03   0.37252   1.07756   3.58586      8600         0         0
+1   0   1   0    0     0.7   189.0    -1.1    72.2         0      87.7      87.7   0.40591   1.09420       inf     413.7         0         0
+StPropDrift
+0   8  23   8    0     7.5     5.3    -4.2    -2.4      1.28      72.2  1.66e+03   0.37252   1.07756   3.58586      8600      1.28      11.5
+1   0   1   0    0   245.5   189.0    91.5    72.2      1.28      87.7      87.7   0.40591   1.09420       inf     413.7      1.31      10.7
+StApertureSquare
+0   8  23   8    0     7.5     5.3    -4.2    -2.4      1.28      72.2  1.66e+03   0.37252   1.07756   3.58586      8600      1.28      11.5
+1   0   1   0    0   245.5   189.0    91.5    72.2      1.28         0         0   0.00000   1.00000       nan         0      1.31      10.7
+StPropDrift
+0   8  23   8    0     0.7     5.3    -1.1    -2.4         0      72.2  1.66e+03   0.37252   1.07756   3.58586      8600         0         0
+1   0   1   0    0     0.7   189.0    -1.1    72.2         0         0         0   0.00000   1.00000       nan         0         0      -inf
+StPropMapCosy
+0   8  23   8    0    15.5    10.6    -5.9    -3.7      1.57      72.2  1.66e+03   0.37252   1.07756   3.58586      8600      1.58      14.2
+1   0   1   0    0   301.8   189.0   112.8    72.2      1.57         0         0   0.00000   1.00000       nan         0      1.61       nan
+StApertureSquare
+0   8  23   8    0    15.5    10.6    -5.9    -3.7      1.57      72.2  1.66e+03   0.37252   1.07756   3.58586      8600      1.58      14.2
+1   0   1   0    0   301.8   189.0   112.8    72.2      1.57         0         0   0.00000   1.00000       nan         0      1.61       nan
+StPropDrift
+0   8  23   8    0    85.3    10.6   -30.5    -3.7      8.17      72.2  1.66e+03   0.37252   1.07756   3.58586      8600      8.18      73.2
+1   0   1   0    0  1563.5   189.0   589.7    72.2      8.17         0         0   0.00000   1.00000       nan         0      8.34       nan
+StApertureSquare
+0   8  23   8    0    85.3    10.6   -30.5    -3.7      8.17      72.2  1.66e+03   0.37252   1.07756   3.58586      8600      8.18      73.2
+1   0   1   0    0  1563.5   189.0   589.7    72.2      8.17         0         0   0.00000   1.00000       nan         0      8.34       nan
+StPropDrift
+0   8  23   8    0    85.3    10.6   -30.5    -3.7      8.17      72.2  1.66e+03   0.37252   1.07756   3.58586      8600      8.18      73.2
+1   0   1   0    0  1563.5   189.0   589.7    72.2      8.17         0         0   0.00000   1.00000       nan         0      8.34       nan
+oyster> 
+\endverbatim
+
+\subsection subsec_root Introduction to root
+
+Have a look at \c tree0.C.  To be found here
+
+<tt>$(root-config --prefix)/share/doc/root/tutorials/</tt>
+
+
+\subsection subsec_ana  Analysis of mona data
+
+\subsection subsec_flt  Conversion of the root tree to filtered format (for NSCL SpecTcl)
+
+
+
+\section sec_prog Programmers Manual for st_mona
+
+
+\section sec_new How to build a new simulation
+
+
+\section compile Getting the source and compilation
+- svn checkout <a href="http://www.mpi-hd.mpg.de/cbsvn/st/trunk/">http://www.mpi-hd.mpg.de/cbsvn/st/trunk/</a>
+- need root and gsl, i.e. the command gsl-config and root-config should 
+    be in the path
+- just type 'make'
+- to generate the documentation type 'make doc'
+
+\section sec-files Using this documentation
+- start by browsing the classes or files
+- ...
+
+*/
+

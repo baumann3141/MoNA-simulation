@@ -1,0 +1,67 @@
+# Last edited by Shea Mosby on 6/17/09
+
+This is to be documentation on how the MoNA Geant4 simulation works and what files do what.
+
+There are 2 input files:
+    mona_config - 
+    neutron_config - 
+
+
+#######################
+## File Desctiptions ##
+#######################
+mona_shea.cc:
+    - Contains the main() for Geant. Overall control flow for the program.
+    - Reads (hard-coded) "detector_config" detector configuration file to deterine where things go.
+    - Determines where all the detectors are to go, what they are made of, passes this info to
+        Detector construction object.
+    - Makes a vector of Arrays to hold this information
+
+Array.cc/hh:
+    - Most broad organization of the detectors... by Array
+    - Each array knows where the target is and has a vector of layers to tell them about the detectors.
+    - Has a name to distinguish itself from other arrays.
+    - Has addLayer fct used to add layers to the layer vector. Info comes from input file
+
+Layer.cc/hh:
+    - Next most general collection of detectors
+    - knows the position and facing of the center of the layer.
+    - "facing" vector points in the direction normal to the plane of the layer.
+    - Each layer has a unique name which comes from input file
+    - Each layer has a type which tells it about what kinds of detectors are in it.
+    - Has a number of detectors which tells it how many of the detectors it has.
+    - Funcions to get / set all these parameters.
+    - It is planned to also be able to pass a "style file" which can be used to heavily
+        customize detector positions / facings... e.g. CAESAR rings.
+
+DetectorInterface.cc/hh:
+    - Used for communicating between Array/Layer classes and Detector class.
+    - Basically an interpreter that knows how to turn the desires of Array/Layer classes
+        into Detector objects.
+    - Has databases of created elements, materials, logical volumes so that these don't get created
+        absurd numbers of times... testing has shown that not doing this slows the program down.
+    - Most important fct is the addDetector function which determines which of the daughter classes
+        of Detector to create objects of... must be edited to add new detector types.
+
+Detector.cc/hh:
+    - Used to create the detectors used in the simulation.
+    - Has "Detector" base class containing general functions/properties like position, facing,
+        type, name, size.
+    - The properties of each detector type to be made are defined in daughter classes like MoNABar.
+    - The important functions to look at are makeElements, makeMaterials, makeLogVols which do
+        exactly what the function name says. They are currently in flux as I determine the best
+        methods to implement this functionality.
+
+MoNADetectorConstruction.cc/hh:
+    - Inherits from G4UserDetectorConstruction, which is a so-called "mandatory initialization class"
+        in geant. You must define stuff here, or geant won't run.
+    - Creates a "world" volume that all the simulation takes place in, and places all the detectors in it.
+    - Currently simply loops over all the detectors in all the layers in all the arrays that were created.
+    - main() has to pass the vector of arrays to it so it knows what was made.
+    - Currently in flux as I determine how best to implement more complex features.
+
+MoNAPrimaryGeneratorAction.cc/hh:
+    - Used to generate the events (fire the neutrons) for the simulation.
+    - uses the pythia event generator.
+    - currently looks for (hard coded) file "neutron.py"
+    - in progress: have it take the target position from input file

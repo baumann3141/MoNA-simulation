@@ -1,0 +1,13 @@
+
+
+Lines to add to your .bashrc file in order to use st_mona & root:
+
+
+
+
+export ROOTSYS=/projects/proj6/mona-sim/soft/root/root_v5.12_00/
+
+PATH=${ROOTSYS}bin:/user/scheit/bin:${ROOTSYS}include/:$PATH
+
+export LD_LIBRARY_PATH=$ROOTSYS/lib:$LD_LIBRARY_PATH
+

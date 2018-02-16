@@ -1,0 +1,23 @@
+# This file controls the MoNA layer properties... you can have as many layers as you want.
+# Just add a line for each additional layer
+# Using r in the coordinate specifies "relative coordinates" which means relative to the
+# previous element... so you can specify the 1st layer's location relative to the target,
+# the second layer relative to the first, etc. Simply using a number uses the absolute coordinates
+# of the simulation
+# g will allow you to specify the "gap" between layers if you want - this is the measured
+# edge to edge value. It auto-sets the facing vector... you can override it by setting the vector though
+# !<Name> declares a new array.
+!target position (X Y Z in cm)
+0. 0. 0.
+# after the layer tag comes layer position, # of bars, facing, rotation, type, name (X Y Z in cm, integer, facing X Y Z, string, string) 
+!MoNA
+#06025 MoNA Location
+0.0 -5.0 790.4 16 0.0 0.0 -1.0 00.0 MoNABar A
+0.0 -5.0 800.4 16 0.0 0.0 -1.0 00.0 MoNABar B
+0.0 -5.0 893.9 16 0.0 0.0 -1.0 00.0 MoNABar C
+0.0 -5.0 904.4 16 0.0 0.0 -1.0 00.0 MoNABar D
+0.0 -5.0 997.4 16 0.0 0.0 -1.0 00.0 MoNABar E
+0.0 -5.0 1007.9 16 0.0 0.0 -1.0 00.0 MoNABar F
+0.0 -5.0 1068.4 16 0.0 0.0 -1.0 00.0 MoNABar G
+0.0 -5.0 1078.9 16 0.0 0.0 -1.0 00.0 MoNABar H
+0.0 -5.0 1089.4 16 0.0 0.0 -1.0 00.0 MoNABar I

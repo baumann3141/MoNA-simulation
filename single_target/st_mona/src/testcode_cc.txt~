@@ -1,0 +1,254 @@
+    // Glauber momentum kick 
+    double sig, sig0;
+    sig0 = 90;  // MeV/c
+    sig = p->getA() * ( fNn + fNp ) / ( A - 1);
+    if (sig < 0) ERR("sig < 0; sig = %g", sig);
+    sig = fGlauberKickScale * sig0 * sqrt(sig);
+    DSV(sig);
+    
+    cosTheta = fRngUniform->value(-1,1);// cos(theta)
+    theta    = acos(cosTheta);
+    phi      = fRngUniform->value(0,2.*M_PI);  // phi
+    DSV(theta);
+    DSV(phi);
+    
+    fRngGaussGlauber->setCentroid(0);
+    fRngGaussGlauber->setSigma(sig);
+    
+    double glaubP = fRngGaussGlauber->value();
+    //-=-=-==--=-=-=-==
+    //idea to create tail in mom. distribution following LISE++, zwk
+    if(glaubP < 0) glaubP = glaubP * fAsymMomentum;
+    //--------------------
+    
+    DSV(glaubP);
+    TVector3 vGlaubP(0,0,glaubP);
+    vGlaubP.SetTheta(theta);
+    vGlaubP.SetPhi(phi);
+    
+    TVector3 vP;                  // total momentum
+    vP = tl.Vect() + vGlaubP;
+    tl.SetVectM(vP,p->getm());
+    DSV(tl.Theta());
+    DSV(tl.Phi());
+    DSV(tl.E() - tl.M());
+    
+    //debugging stuff
+    if (debugSwitch == "thetaLABP")
+      cout << tl.Theta()<< endl;
+    if (debugSwitch == "phiLABP")
+      cout << tl.Phi()<< endl;
+    
+    // End Glauber Kick, Record Boost
+    TVector3 t3Boost;
+    t3Boost = tl.BoostVector();  // boost vector 
+    //cout << pFile << endl;
+    //fprintf(pFile, "test \n");
+    //fprintf(pFile, "%f \t %f \t %f \t %f \t %i \n" ,tl.Px() ,tl.Py() ,tl.Pz() ,tl.E(), p->getA() );
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+//ANK i probably need some if statement like this:
+
+if(fWhichEnergyDoIReconstruct=="4body_constrained"){
+
+ // Remove the first 2 neutrons, then do a 3body or di-neutron decay
+    // start of neutron evaporation
+    p->setA(p->getA() - 1);
+    p->setm(p->getA()*931.494088);
+    p->setEkin(0);             
+    
+    TLorentzVector tl1;  // particle 1 (heavy fragment)
+    tl1.SetPxPyPzE(p->getPx(), p->getPy(), p->getPz(), p->getEtotal());
+    
+    // create neutron
+    StParticle pp;   
+    pp.setA(1);
+    pp.setm(pp.getA()*939.565346);//939.565346
+    pp.setZ(0);
+    pp.setQ(0);
+    pp.setx(p->getx());     // same position
+    pp.sety(p->gety()); 
+    pp.setz(p->getz());     
+    pp.sett(p->gett());     // same time
+    pp.setEkin(0);
+    
+    TLorentzVector tl2;  // particle 2 (neutron)
+    tl2.SetPxPyPzE(pp.getPx(), pp.getPy(), pp.getPz(), pp.getEtotal());
+    
+    double eN, eF;   // total neutron and fragment energy
+    double eCM;   // total CM energy
+    
+    eCM = pp.getm() + p->getm() + exen1;  // total CM energy
+    eN = gsl_pow_2(eCM) + gsl_pow_2(pp.getm()) - gsl_pow_2(p->getm());
+    eN = eN/(2.*eCM);                    // total energy neutron
+    eF = gsl_pow_2(eCM) - gsl_pow_2(pp.getm()) + gsl_pow_2(p->getm());
+    eF = eF/(2.*eCM);                    // total energy of fragment
+    
+    /// \todo check is arg of sqrt is positive
+    double pN,pF; // fragment and neutron momentum
+    pN = eN*eN - gsl_pow_2(pp.getm());
+    pN = sqrt(pN);
+    pF = eF*eF - gsl_pow_2(p->getm());
+    if (pF < 0)
+      pF = 0;
+    else 
+      pF = sqrt(pF);
+    pF = -pF;  // fragment goes in opposite direction
+    
+    tl1.SetPxPyPzE(0,0,pF,eF);
+    tl2.SetPxPyPzE(0,0,pN,eN);
+    
+    // set theta and phi for the first decay to some random value
+    cosTheta = fRngUniform->value(-1,1);       // cos(theta)
+    theta    = acos(cosTheta);
+    phi      = fRngUniform->value(0,2.*M_PI);  // phi
+    fThetaMap[0] = theta;
+    fPhiMap[0]   = phi;
+    
+    tl1.SetTheta(theta); // Set fragment angle
+    tl1.SetPhi(phi); // Set fragment phi angle
+    tl2.SetTheta(M_PI - theta); // Set neutron angle 180-theta
+    tl2.SetPhi(phi + M_PI); // set neutron phi angle
+    
+    TVector3 t4Boost;
+    t4Boost = tl1.BoostVector();  // boost vector for 24O
+   
+
+ 
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////
+
+ // Begin 3body phase space decay
+  // Now boost everything back to the lab frame, since TGenPhase space takes arguments in the lab frame
+  
+  //Boosting into the frame where the fragment is at rest after the first decay
+  tl1.Boost(t4Boost); 
+  //Boosting all three particles to the lab frame
+  tl1.Boost(t3Boost);
+  tl2.Boost(t3Boost);
+//tl3.Boost(t2Boost);
+
+
+  //printf("AFTER 2n SEQUENTIAL: ------------------------------\n");
+  //printf("FRAGMENT: %f | %f | %f | %f \n", tl1.Px(), tl1.Py(),  tl1.Pz(), tl1.E() );
+  //printf("NEUTRON1: %f | %f | %f | %f \n", tl2.Px(), tl2.Py(),  tl2.Pz(), tl2.E());
+  //printf("NEUTRON2: %f | %f | %f | %f \n", tl3.Px(), tl3.Py(),  tl3.Pz(), tl3.E());
+  //printf("TOTAL:    %f | %f | %f | %f \n", tl1.Px() + tl2.Px() + tl3.Px(), tl1.Py() + tl2.Py() + tl3.Py(), tl1.Pz() + tl2.Pz() + tl3.Pz(), tl1.E() + tl2.E() + tl3.E());
+
+
+  // set fragment energy and direction
+  p->setEtotal(tl1.E()); /// \todo implement setLVec() to set particle data from 4-vector
+  p->setThetaPhi(tl1.Theta(),tl1.Phi()); 
+  
+  // set neutron energy and direction
+  pp.setEtotal(tl2.E());
+  pp.setThetaPhi(tl2.Theta(),tl2.Phi()); 
+
+  if(! newPart) ERR("Pointer newPart not set; Cannot add new particles");
+  newPart->push_back(pp); 
+
+  // set second neutron energy and direction
+//ANK if this is from original decay i don't need the ppp
+// ppp.setEtotal(tl3.E());
+// ppp.setThetaPhi(tl3.Theta(),tl3.Phi());
+// if(! newPart) ERR("Pointer newPart not set; Cannot add new particles");
+// newPart->push_back(ppp); 
+
+  vP = tl1.Vect();// CHECK THIS tl1 is the lorentz vector of the fragment
+  
+  //Now have the excited fragment in TLorentzVector tl1
+  //Use 3-body decay from ROOT to decay Frag* -> frag + n +n
+  //Units are GeV and GeV/c!!
+  
+  //set lorentz vector of decaying system (GeV unit)
+  //need to set_mass to the same as the frag+2n since we don't know the mass excess of the 
+  //excited fragment, otherwise can get E of excited frag < then E of the frag-n-n system
+  //and therefore the 3-body decay is forbidden.
+
+  double set_mass = (p->getA()-2)*931.494 + 1.0*931.494 + 1.0*931.494;
+  TLorentzVector t1gev;
+  t1gev.SetVectM(vP*(1/1000.), (set_mass+exen2)/1000.);// Set decay energy here
+   
+  //set the masses of the 3 products.
+  Double_t Mass3body[3] = { (p->getA()-2)*931.494/1000.,  1.0*931.494/1000., 1.0*931.494/1000.};
+  TGenPhaseSpace tPSevent;
+  Bool_t bevent = tPSevent.SetDecay(t1gev, 3, Mass3body);
+  if(!bevent) cerr << "4-Body Decay is Kinematically FORBIDDEN !!!!!" << endl;
+
+  TLorentzVector *pt1, *pt3, *pt4;
+
+  double wtmax = tPSevent.GetWtMax();
+  while(1){    
+    double weight = tPSevent.Generate();
+    double rel_weight = weight / wtmax;
+    double ran = fRngUniform->value(0,1);
+
+    //events are weighted (rel_weight) between 0 and 1
+    //therefore only select event when ran is less then rel_weight
+    //if(ran < rel_weight) break;
+    break; 
+  }
+  pt1 = tPSevent.GetDecay(0); //frag - n
+  pt3 = tPSevent.GetDecay(1); //neutron2
+  pt4 = tPSevent.GetDecay(2); //neutron3
+
+  //The returned Lorentz vectors are automatically boosted into the frame
+  //of the originally decaying fragment
+  //NEED TO CONVERT BACK FROM GEV TO MEV
+
+  //Set fragment info
+  p->setEkin(0);
+  p->setA(p->getA()-2);
+  p->setm(pt1->M()*1000);
+ // set fragment energy and direction
+  p->setEtotal(pt1->E()*1000); /// \todo implement setLVec() to set particle data from 4-vector
+  p->setThetaPhi(pt1->Theta(),pt1->Phi()); 
+  //fThetaMap[0]  = pt1->Theta(); // These values are set in the stripping of the first 2 neutrons
+  //fPhiMap[0]    = pt1->Phi();	  // "
+  fThetaMap2[0] = pt1->Theta(); // "
+  fPhiMap2[0]   = pt1->Phi();   // "
+  fThetaMap3[0] = pt1->Theta();
+  fPhiMap3[0]   = pt1->Phi();
+
+ // set third neutron energy and direction
+  StParticle p3;   
+  p3.setA(1);
+  p3.setm(pt3->M()*1000);
+  p3.setZ(0);
+  p3.setQ(0);
+  p3.setx(p->getx());     // same position
+  p3.sety(p->gety()); 
+  p3.setz(p->getz());     
+  p3.sett(p->gett());     // same time
+  p3.setEkin(0);
+  p3.setEtotal(pt3->E()*1000);
+  p3.setThetaPhi(pt3->Theta(),pt3->Phi());
+
+  if(! newPart) ERR("Pointer newPart not set; Cannot add new particles");
+  newPart->push_back(p3); 
+
+ // set fourth neutron energy and direction
+  StParticle p4;   
+  p4.setA(1);
+  p4.setm(pt4->M()*1000);
+  p4.setZ(0);
+  p4.setQ(0);
+  p4.setx(p->getx());     // same position
+  p4.sety(p->gety()); 
+  p4.setz(p->getz());     
+  p4.sett(p->gett());     // same time
+  p4.setEkin(0);
+  p4.setEtotal(pt4->E()*1000);
+  p4.setThetaPhi(pt4->Theta(),pt4->Phi());
+
+
+  if(! newPart) ERR("Pointer newPart not set; Cannot add new particles");
+  newPart->push_back(p4); 
+
+}
+  //-------------------------------------------------------------------------------------------------------
+  // End 3body phase space decay
+}

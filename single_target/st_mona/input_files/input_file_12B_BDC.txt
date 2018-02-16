@@ -1,0 +1,35 @@
+#INFO("Using default values for experiment e15091, 12B beam down center.");
+	reacType        =       "glaub_noDecay";
+        eBeam		=	43.94031; # MeV/u
+	beamA		=	12;
+	beamZ		=	5;
+	dTarget 	=	0.0000000000000000001; # mg/cm^2
+	dEbeam		=	0.01;
+	resTime		=	0.3; # ns
+	nNeutr		=	0;
+	nProt		=	0;
+	bSpotCx		=	-0.00300; # m
+	bSpotCtx	=	-0.01100; # rad
+	bSpotCy		=	-0.00500; # m
+	bSpotCty	=	0.00100; # rad
+	bSpotDx		=	0.00930; # m
+	bSpotDy		=	0.00700; # m
+	bSpotDtx	=	0.00930; # rad
+	bSpotDty	=	0.00437; # rad
+	bSpotSxtx	=	-0.0012; # sqrt(m * rad)
+	bSpotSyty	=	-0.0008; # sqrt(m * rad)
+	crdc1MaskLeft	=	0.15; # m
+	crdc1MaskRight	=	-0.15; # m
+	crdc2MaskLeft	=	0.15; # m
+	crdc2MaskRight	=	-0.15; # m
+	crdc2MaskTop	=	0.15; # m
+	crdc2MaskBot	=	-0.15; # m
+	crdc2dist	=	1.549; # m
+	cosymap		= 	"m12B_e15091";
+	fragA		=	12;
+	fragZ		=	5;
+	targA		=	9;
+	targZ		=	4;
+	maxbulge 	= 	0.0000000000000001; # m
+	tflatfoil	=	0.0000000000000001;
+

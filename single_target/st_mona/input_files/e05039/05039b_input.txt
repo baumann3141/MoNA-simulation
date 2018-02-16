@@ -1,0 +1,21 @@
+#INFO("Using default values for experiment 05039 (Hoffman 25O)");
+        eBeam           = 86.0;
+        beamA           = 26;
+        beamZ           = 9;
+        dTarget         = 470.0;
+        dEbeam          = 0.01;
+        resTime         = .3;
+        nNeutr          = 2;
+        nProt           = 1;
+	bSpotDx         = 0.009; # sigma
+        bSpotDy         = 0.008; 
+        bSpotDtx        = 0.019;  
+        bSpotDty        = 0.006;
+	bSpotCtx        = -0.008;                          
+	bSpotCx         = 0.00175;                         
+        bSpotCty        = 0.002;                          
+	bSpotCy         = 0.0;
+        crdc1MaskLeft   =  0.15;
+        crdc1MaskRight  = -0.15;
+        crdc2dist       = 1.88;
+        monaDist        = 8.200;

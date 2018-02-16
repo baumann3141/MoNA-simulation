@@ -1,0 +1,19 @@
+#INFO("Using default values for experiment 03038 (7He NO TARGET)");
+        eBeam           = 40.0;
+        beamA           = 9;
+        beamZ           = 3;
+        dTarget         = 1e-7; # from T. Baumann Oct 2006
+        dEbeam          = 0.01;
+        resTime         = 0.3;
+        nNeutr          = 0;
+        nProt           = 0;
+        bSpotDx         = 0.004; # sigma from D. Denby Oct 11,2006
+        bSpotDy         = 0.008; # sigma from D. Denby Oct 11,2006
+        bSpotDtx        = 0.011; # sigma from D. Denby Oct 11,2006
+        bSpotDty        = 0.005; # sigma from D. Denby Oct 11,2006
+        crdc1MaskLeft   =  0.15 - 0.064; # Will probably explode when converted to double
+        crdc1MaskRight  = -0.15;
+        crdc2dist       = 1.00;
+        monaDist        = 8.20;
+	scaleStrag      = 0;
+	scaleGlaub      = 0; 

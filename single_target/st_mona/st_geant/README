@@ -1,0 +1,41 @@
+
+ST_GEANT INSTRUCTIONS
+
+Type:
+
+> st_geant --help
+
+to learn how to use this program.
+
+
+
+COMPILATION INSTRUCTIONS
+
+To compile st_geant, run the compile.sh executable:
+
+> ./compile.sh
+
+You need to be on a 64-bit "fishtank" machine and have the proper 
+PATH and LD_LIBRARY_PATH environment variables set in order to run
+the program or to compile it.
+
+Your PATH needs to include:
+
+/projects/proj6/mona-sim/soft/root/root_v5.12_00/bin/
+                          and
+/projects/proj6/mona-sim/soft/root/root_v5.12_00/include/
+
+
+Your LD_LIBRARY_PATH needs to include:
+
+/projects/proj6/mona-sim/soft/root/root_v5.12_00/lib/
+
+If this is not the case, then you can make it so by typing:
+
+> export ROOTSYS=/projects/proj6/mona-sim/soft/root/root_v5.12_00/
+> export PATH=$ROOTSYS/bin/:$ROOTSYS/include/:$PATH
+> export LD_LIBRRY_PATH=$ROOTSYS/lib/:$LD_LIBRARY_PATH
+
+(You might want to add these lines to your ~/.bashrc file so that 
+the right PATH and LD_LIBRARY_PATH are set every time you start a
+session.)

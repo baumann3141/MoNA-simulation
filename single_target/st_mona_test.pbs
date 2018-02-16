@@ -1,0 +1,16 @@
+#!/bin/sh
+### name of job
+#PBS -N swave_loop_3n_const_background
+### email on _a_bort, _b_egin, _e_nd
+#PBS -m abe
+### combine stdout/stderr
+#PBS -j oe
+### resource requests (time in HH:MM:SS)
+#PBS -l walltime=01:00:00
+### dont retry
+#PBS -r n
+### number of CPUS
+#PBS -l nodes=4
+cd ${PBS_O_WORKDIR}
+./MoNASIM_Script_12He_const_3n+swave_loop.sh 10.0 1.776 -0.5 1000000
+

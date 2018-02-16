@@ -1,0 +1,20 @@
+#INFO("Using default values for 05034-14Be Beam (11Li+2n)");
+        eBeam           = 53.6;
+        beamA           = 14;
+        beamZ           = 4;
+        dEbeam          = 0.024;
+        resTime         = .3;
+        nNeutr          = 0;
+        nProt           = 1;
+        bSpotDx         = 0.005; 
+        bSpotDy         = 0.005; 
+        bSpotDtx        = 0.023; 
+        bSpotDty        = 0.012; 
+        crdc1MaskLeft   =  0.15;
+        crdc1MaskRight  = -0.15;	
+	crdc2MaskLeft  =  0.15;   #crdc2 mask added zwk 8/16/11                             
+	crdc2MaskRight = -0.15;                              
+	crdc2MaskTop  =  0.15;                              
+	crdc2MaskBot = -0.15;   
+        crdc2dist       = 1.816;
+        monaDist        = 8.44;

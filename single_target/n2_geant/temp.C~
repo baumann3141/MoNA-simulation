@@ -1,0 +1,60 @@
+void temp(){
+
+  for (int l=0;l<9;++l)
+    {
+      for (int b=0;b<8;++b)
+	{
+	  location.x[l][b] = -48.5678 - 5.13*cos(86.395*(PI/180.)) - 10.26*l*cos(86.395*(PI/180.));
+	  location.y[l][b] = 10.26*b - 36.04;
+	  location.z[l][b] = 639.9243 + 5.13*sin(86.395*(PI/180.)) + 10.26*l*sin(86.395*(PI/180.));
+	  location.ox[l][b] = cos(86.395*PI/180.);
+	  location.oy[l][b] = 0.;
+	  location.oz[l][b] = sin(86.395*PI/180.);
+
+	  if(b==0){
+	    
+	    printf("%f %f %f 16 %f %f %f\n",location.x[l][b],location.y[l][b],location.z[l][b],location.ox[l][b],location.oy[l][b],location.oz[l][b]);
+	  }
+
+
+	}
+    }
+  // MoNA' position varibales
+  for (int l=0;l<4;++l)
+    {
+      for (int b=8;b<16;++b)
+	{
+	  location.x[l][b] = 184.4088 + 5.13*cos(76.8605*(PI/180.)) + 10.26*l*cos(76.8605*(PI/180.));
+	  location.y[l][b] = 10.26*(b-8) - 36.04;
+	  location.z[l][b] = 426.8335 + 5.13*sin(76.8605*(PI/180.)) + 10.26*l*sin(76.6805*(PI/180.));
+	  location.ox[l][b] = -cos(76.6805*(PI/180.));
+	  location.oy[l][b] = 0.;
+	  location.oz[l][b] = sin(76.8605*(PI/180.));
+
+	  if(b==0){
+	    
+	    printf("%f %f %f 16 %f %f %f\n",location.x[l][b],location.y[l][b],location.z[l][b],location.ox[l][b],location.oy[l][b],location.oz[l][b]);
+	  }
+
+	}
+    }
+  for (int l=4;l<9;++l)
+    {
+      for (int b=8;b<16;++b)
+	{
+	  location.x[l][b] = 207.0197 + 5.13*cos(77.1846*(PI/180.)) + 10.26*(l-4)*cos(77.1846*(PI/180.));
+	  location.y[l][b] = 10.26*(b-8) - 36.04;
+	  location.z[l][b] = 523.6891 + 5.13*sin(77.1846*(PI/180.)) + 10.26*(l-4)*sin(77.1846*(PI/180.));
+	  location.ox[l][b] = -cos(77.1846*(PI/180.));
+	  location.oy[l][b] = 0.;
+	  location.oz[l][b] = sin(77.1846*(PI/180.));
+
+	  if(b==0){
+	    
+	    printf("%f %f %f 16 %f %f %f\n",location.x[l][b],location.y[l][b],location.z[l][b],location.ox[l][b],location.oy[l][b],location.oz[l][b]);
+	  }
+
+	}
+    }
+
+}

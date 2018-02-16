@@ -1,0 +1,20 @@
+#INFO("Using default values for experiment 03048c (mimic 11Be singles)");
+        eBeam           = 89.0;
+        beamA           = 12;
+        beamZ           = 4;
+        dTarget         = 258.0; 
+        dEbeam          = 0.01;
+        resTime         = .1;
+        scaleStrag      = 0;
+	scaleGlaub      = 0;
+        nNeutr          = 0;
+        nProt           = 0;
+        bSpotDx         = 0.003; # sigma (m)
+        bSpotDy         = 0.05; 
+        bSpotDtx        = 0.000002;  # (rad)
+        bSpotDty        = 0.003;
+        crdc1MaskLeft   = 0.15 - 0.12; #page 33 03048
+	bSpotCx         = 0.003;                          
+        crdc1MaskRight  = -0.15;
+        crdc2dist       = 1.88;
+        monaDist        = 8.258;

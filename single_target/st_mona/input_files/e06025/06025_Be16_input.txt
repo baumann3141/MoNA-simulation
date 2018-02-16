@@ -1,0 +1,21 @@
+#INFO("Using default values for 06025-17B Beam (16Be->14Be+2n)");
+        eBeam           = 53.1;# from LISE++ file of the experiment
+        beamA           = 17;
+        beamZ           = 5;
+        dTarget         = 470;  
+        dEbeam          = 0.02; # check if this is correct!!!!!!!!!!!!!!!!!!!
+        resTime         = .3;
+        nNeutr          = 0;
+        nProt           = 1;
+        bSpotDx         = 0.006; 
+        bSpotDy         = 0.004; 
+        bSpotDtx        = 0.007; 
+        bSpotDty        = 0.002; 
+        crdc1MaskLeft   =  0.09;
+        crdc1MaskRight  = -0.09;
+        crdc2dist       = 1.829;
+        monaDist        = 7.904;
+	crdc2MaskLeft   =  0.15;   #crdc2 mask added zwk 8/16/11                             
+	crdc2MaskRight  = -0.121;                              
+	crdc2MaskTop    =  0.12;                              
+	crdc2MaskBot    = -0.0; 
