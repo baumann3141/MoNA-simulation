@@ -1,8 +1,0 @@
-set xrange [0:0.5]
-set xlabel "Decay Energy (MeV)"
-p "phase_ang_45.75_0.25.cross" w l,\
-"phase_ang_45.75_0.5.cross" w l,\
-"phase_ang_45.75_1.0.cross" w l,\
-"phase_ang_45.75_1.5.cross" w l,\
-"phase_ang_45.75_2.0.cross" w l,\
-"phase_ang_45.75_4.0.cross" w l
