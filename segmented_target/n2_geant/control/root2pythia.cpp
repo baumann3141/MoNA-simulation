@@ -561,11 +561,49 @@ int main(int argc, char *argv[])
         {
 	  // Here is where single neutron stuff is done
 	  // Now we find the relevant branches to look at
+	  /*
 	  Double_t ekin,x,y,z;
 	  TBranch *bekin = t->GetBranch("b9p1Ekin");
 	  TBranch *bx = t->GetBranch("b9p1x");
 	  TBranch *by = t->GetBranch("b9p1y");
 	  TBranch *bz = t->GetBranch("b9p1z");
+	  */
+	  // THR 15 February 2018: get the correct neutron branches based on
+	  // which Be was specified as the reaction target
+	  const Double_t zArb = 1.;// [m] for e15118
+	  Double_t ekin,x,y,z;
+	  TBranch *bekin;
+	  TBranch *bx;
+	  TBranch *by;
+	  TBranch *bz;
+
+	  if(slice==1){
+	  bekin = t->GetBranch("b3p1Ekin");
+	  bx = t->GetBranch("b3p1tx");
+	  by = t->GetBranch("b3p1ty");
+	  bz = t->GetBranch("b3p1z");
+	  
+	  }
+	  else if(slice==2){
+	  bekin = t->GetBranch("b5p1Ekin");
+	  bx = t->GetBranch("b5p1tx");
+	  by = t->GetBranch("b5p1ty");
+	  bz = t->GetBranch("b5p1z");
+	  }
+	  else if(slice==3){
+	  bekin = t->GetBranch("b7p1Ekin");
+	  bx = t->GetBranch("b7p1tx");
+	  by = t->GetBranch("b7p1ty");
+	  bz = t->GetBranch("b7p1z");
+	  }
+	  else{
+	  cout << "Setting neutron branches to b14, who knows if this is right ..." << endl;
+	  bekin = t->GetBranch("b14p1Ekin");
+	  bx = t->GetBranch("b14p1x");
+	  by = t->GetBranch("b14p1y");
+	  bz = t->GetBranch("b14p1z");
+	  }
+
 
 	  // Set addresses
 	  bekin->SetAddress(&ekin);
@@ -598,10 +636,15 @@ int main(int argc, char *argv[])
 		// Now set these things in the lorentz vector and convert to GeV for pythia's sake
 		neut->SetE(energy/1000.);
 		neut->SetPz(momentum_mag/1000.); // Pz because we can then rotate it
-		// Now we must calculate theta and phi
-		Double_t rho = sqrt(x*x + y*y);
-		Double_t theta = atan(rho/z);
+		Double_t xx = zArb*tan(x);
+		Double_t yy = zArb*tan(y);
+		Double_t rho= sqrt(xx*xx + yy*yy);
+		Double_t theta = atan(rho/zArb);
 		Double_t phi = 0.;
+		// Now we must calculate theta and phi
+//		Double_t rho = sqrt(x*x + y*y);
+//		Double_t theta = atan(rho/zArb);
+//		Double_t phi = 0.;
 		const Double_t pi = 3.141592653589793238462643383279;
 		// Phi is trickier because it goes from 0 to 2pi
 		// First do first neutron

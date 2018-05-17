@@ -50,8 +50,8 @@ int StSystem::run(int n, string f) {
     if(f.find("crdc2_cut")!=string::npos && (fRuns%25000)==0) printf("   Killed Runs: %d   Written Runs: %d  (CRDC2_cut is applied)\n",killed_runs, written_runs);
     //printf("\n --Run Number: %d\n",fRuns);
 
-    for (size_t j(0); j < fBle.size(); j++) {  // loop over beam line elements
-//    for (size_t j(0); j < 3; j++) {  // loop over beam line elements
+//    for (size_t j(0); j < fBle.size(); j++) {  // loop over beam line elements
+    for (size_t j(0); j < 9; j++) {  // loop over beam line elements
       //cout << fBle.at(j)->getName() << " " << fBle.at(j)->getID() << " " << fBle.at(j)->getName() <<  endl;            // print name of BLE MDJ
       fBle.at(j)->act(&fP);                    // act on all particles with current BLE
             if (f.find("print")!=string::npos) {    // print info if wanted

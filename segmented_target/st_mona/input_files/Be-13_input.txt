@@ -1,9 +1,9 @@
 #INFO("Values for PAC42 proposal");
 	reacType	=	"3body_decay";
-	eBeam		=	59.34;
-	beamA		=	14;
-	beamZ		=	4;
-	dTarget		=	188.0;
+	eBeam		=	100.;
+	beamA		=	26;
+	beamZ		=	9;
+	dTarget		=	705.0;
 	dEbeam		=	0.04;
 	resTime		=	0.3;
 	nNeutr		=	1;

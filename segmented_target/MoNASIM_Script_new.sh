@@ -52,7 +52,7 @@ printf "Reaction Target:      ${TargetID}\n"
 #fi
 
 ### Set the name for the output root files here ###
-FileName="ST_Be-13"
+FileName="ST_N-24"
 
 ### Here is where you set the incident beam parameters,
 ### the glauber kick, the reaction type and parameters.
@@ -61,10 +61,10 @@ FileName="ST_Be-13"
 ### examples to demonstrate how i've simulated different
 ### decays:
 
-#### ---- PAC42 Be-13 -> Be-12 + n ---- ####
+#### ---- PAC42 N-24 -> N-23 + n ---- ####
 
-#### Be-12 from Be-13 ####
-arguments=" -exp PAC42_Be-13 -geant -glaub 0.5 -be 60.0 -dbe 0.0 -reac glaub -e swave 1.78 10 -n 1000 -slice ${TargetID} -strag 1" #-n number of events.
+#### N-24 from F-26 ####
+arguments=" -exp PAC42_N-24 -geant -glaub 0.5 -be 100.0 -dbe 0.0 -reac glaub -e const 1.0 -n 100 -slice ${TargetID} -strag 1" #-n number of events.
 
 
 ### The geant simulation is controlled through a python script control.py
@@ -76,7 +76,7 @@ arguments=" -exp PAC42_Be-13 -geant -glaub 0.5 -be 60.0 -dbe 0.0 -reac glaub -e 
 controlargs="-n 1 -g ${TargetID}"
 
 #fragment for mona_analysis.cc
-FRAGname="Be-12"
+FRAGname="N-23"
 
 ### Specify the MoNA Detector Config File which
 ### should sit in the n2_geant/ directory
@@ -99,10 +99,10 @@ export GSL_RNG_SEED=55496
 #export MENATEG4XS="/projects/mona-sim/hope_geant/MENATE_R_CrossSections/"
 
 ### Paths to access the executables
-stmonapath="/projects/mona-sim/baumann/st_mona"
-stmonapathred="/projects/mona-sim/baumann/st_mona"
-inputpath="/projects/mona-sim/baumann/st_mona/input_files"
-n2geantpath="/projects/mona-sim/baumann/n2_geant"
+stmonapath="/projects/mona-sim/baumann/segmented_target/st_mona"
+stmonapathred="/projects/mona-sim/baumann/segmented_target/st_mona"
+inputpath="/projects/mona-sim/baumann/segmented_target/st_mona/input_files"
+n2geantpath="/projects/mona-sim/baumann/segmented_target/n2_geant"
 
 ### Path to save data files
 analysispath="/mnt/simulations/MoNAsims/baumann"

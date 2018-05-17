@@ -4437,8 +4437,8 @@ int StReacStripEvap::act(StParticle* p, vector<StParticle>* newPart) {
     cosTheta = fRngUniform->value(-1,1);// cos(theta)
     theta    = acos(cosTheta);
     phi      = fRngUniform->value(0,2.*M_PI);  // phi
-    theta = 0.0; // Inserted for test CRH 1/24/08
-    phi = 0.0; // Inserted for test CRH 1/24/08
+//    theta = 0.0; // Inserted for test CRH 1/24/08
+//    phi = 0.0; // Inserted for test CRH 1/24/08
     DSV(theta);
     DSV(phi);
     
@@ -4537,9 +4537,9 @@ int StReacStripEvap::act(StParticle* p, vector<StParticle>* newPart) {
   
   double cosTheta = fRngUniform->value(-1,1);       // cos(theta)
   double theta    = acos(cosTheta);
-  theta = 0.0; // Test CRH
+//  theta = 0.0; // Test CRH
   double phi      = fRngUniform->value(0,2.*M_PI);  // phi
-  phi = 0.0; // Test CRH
+//  phi = 0.0; // Test CRH
   fThetaMap[0] = theta;
   fPhiMap[0]   = phi;
 

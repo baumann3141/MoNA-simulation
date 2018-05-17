@@ -2406,21 +2406,45 @@ int main(int argc, char *argv[])
         {
             // Here is where 1 neutron stuff is done
             // Now we find the relevant branches to look at
-	  Double_t b1p0x,b1p0tx,b1p0y,b1p0ty,b1p0Ekin,b2p0x,b2p0tx,b2p0y,b2p0ty,b2p0t,b2p0z,b2p0TP,b2p0dE,b2p0Ekin,b2p0R_pz,b2p0R_exen,b2p0R_ph,b2p0R_th,b4p0x,b4p0tx,b4p0y,b4p0ty,b4p0t,b4p0Ekin,b6p0Ekin,b6p0x,b6p0y,b6p0tx,b6p0ty,b9p1t,b9p1x,b9p1y,b9p1z,b9p1Ekin;
+//	  Double_t b1p0x,b1p0tx,b1p0y,b1p0ty,b1p0Ekin,b2p0x,b2p0tx,b2p0y,b2p0ty,b2p0t,b2p0z,b2p0TP,b2p0dE,b2p0Ekin,b2p0R_pz,b2p0R_exen,b2p0R_ph,b2p0R_th,b4p0x,b4p0tx,b4p0y,b4p0ty,b4p0t,b4p0Ekin,b6p0Ekin,b6p0x,b6p0y,b6p0tx,b6p0ty,b9p1t,b9p1x,b9p1y,b9p1z,b9p1Ekin;
+	  Double_t b1p0x,b1p0tx,b1p0y,b1p0ty,b1p0Ekin,
+	  b2p0x,b2p0tx,b2p0y,b2p0ty,b2p0z,b2p0dE,b2p0Ekin,
+	  b3p0x,b3p0tx,b3p0y,b3p0ty,b3p0TP,b3p0dE,b3p0Ekin,b3p1Ekin,b3p1tx,b3p1ty,
+	  b4p0x,b4p0tx,b4p0y,b4p0ty,b4p0z,b4p0dE,b4p0Ekin,
+	  b5p0x,b5p0tx,b5p0y,b5p0ty,b5p0TP,b5p0dE,b5p0Ekin,b5p1Ekin,b5p1tx,b5p1ty,
+	  b6p0x,b6p0tx,b6p0y,b6p0ty,b6p0z,b6p0dE,b6p0Ekin,
+	  b7p0x,b7p0tx,b7p0y,b7p0ty,b7p0TP,b7p0dE,b7p0Ekin,b7p1Ekin,b7p1tx,b7p1ty,
+	  b8p0x,b8p0tx,b8p0y,b8p0ty,b8p0z,b8p0dE,b8p0Ekin,
+	  b10p0x,b10p0tx,b10p0y,b10p0ty,b10p0Ekin,b10p0path,
+	  b12p0x,b12p0tx,b12p0y,b12p0ty,b12p0Ekin,b12p0path,
+	  b13p1t,b13p1x,b13p1y,b13p1z,b13p1Ekin;
+	  
+	    // Added segmented target parameters (energy,position,angles)
+	    // for neutron and fragment
             // Make branches and set addresses
             string bn_old[] = {"b1p0x", "b1p0tx", "b1p0y", "b1p0ty", "b1p0Ekin",
-                "b2p0x", "b2p0tx", "b2p0y", "b2p0ty", "b2p0t", "b2p0z", "b2p0TP", "b2p0dE", "b2p0Ekin",
-		"b2p0R_pz","b2p0R_exen", "b2p0R_ph", "b2p0R_th",
-                "b4p0x", "b4p0tx", "b4p0y", "b4p0ty", "b4p0t", "b4p0Ekin",
-                "b6p0x", "b6p0tx", "b6p0y", "b6p0ty", "b6p0Ekin",
-                "b9p1t", "b9p1x", "b9p1y", "b9p1z", "b9p1Ekin",
+                "b2p0x", "b2p0tx", "b2p0y", "b2p0ty", "b2p0z", "b2p0dE", "b2p0Ekin",
+		"b3p0x", "b3p0tx", "b3p0y", "b3p0ty", "b3p0TP", "b3p0dE", "b3p0Ekin", "b3p1Ekin", "b3p1tx", "b3p1ty",
+                "b4p0x", "b4p0tx", "b4p0y", "b4p0ty", "b4p0z", "b4p0dE", "b4p0Ekin",
+		"b5p0x", "b5p0tx", "b5p0y", "b5p0ty", "b5p0TP", "b5p0dE", "b5p0Ekin", "b5p1Ekin", "b5p1tx", "b5p1ty",
+                "b6p0x", "b6p0tx", "b6p0y", "b6p0ty", "b6p0z", "b6p0dE", "b6p0Ekin",
+		"b7p0x", "b7p0tx", "b7p0y", "b7p0ty", "b7p0TP", "b7p0dE", "b7p0Ekin", "b7p1Ekin", "b7p1tx", "b7p1ty",
+                "b8p0x", "b8p0tx", "b8p0y", "b8p0ty", "b8p0z", "b8p0dE", "b8p0Ekin",
+		"b10p0x","b10p0tx","b10p0y","b10p0ty","b10p0Ekin","b10p0path",
+		"b12p0x","b12p0tx","b12p0y","b12p0ty","b12p0Ekin","b12p0path",
+		"b13p1t","b13p1x","b13p1y","b13p1z","b13p1Ekin"
                 };
             double* ps_old[] = {&b1p0x,&b1p0tx,&b1p0y,&b1p0ty,&b1p0Ekin,
-                &b2p0x,&b2p0tx,&b2p0y,&b2p0ty,&b2p0t,&b2p0z,&b2p0TP,&b2p0dE,
-	        &b2p0Ekin,&b2p0R_pz,&b2p0R_exen,&b2p0R_ph,&b2p0R_th,
-                &b4p0x,&b4p0tx,&b4p0y,&b4p0ty,&b4p0t,&b4p0Ekin,
-       	        &b6p0x,&b6p0tx,&b6p0y,&b6p0ty,&b6p0Ekin,
-                &b9p1t,&b9p1x,&b9p1y,&b9p1z,&b9p1Ekin,
+                &b2p0x,&b2p0tx,&b2p0y,&b2p0ty,&b2p0z,&b2p0dE,&b2p0Ekin,
+		&b3p0x,&b3p0tx,&b3p0y,&b3p0ty,&b3p0TP,&b3p0dE,&b3p0Ekin,&b3p1Ekin,&b3p1tx,&b3p1ty,
+                &b4p0x,&b4p0tx,&b4p0y,&b4p0ty,&b4p0z,&b4p0dE,&b4p0Ekin,
+		&b5p0x,&b5p0tx,&b5p0y,&b5p0ty,&b5p0TP,&b5p0dE,&b5p0Ekin,&b5p1Ekin,&b5p1tx,&b5p1ty,
+                &b6p0x,&b6p0tx,&b6p0y,&b6p0ty,&b6p0z,&b6p0dE,&b6p0Ekin,
+		&b7p0x,&b7p0tx,&b7p0y,&b7p0ty,&b7p0TP,&b7p0dE,&b7p0Ekin,&b7p1Ekin,&b7p1tx,&b7p1ty,
+                &b8p0x,&b8p0tx,&b8p0y,&b8p0ty,&b8p0z,&b8p0dE,&b8p0Ekin,
+		&b10p0x,&b10p0tx,&b10p0y,&b10p0ty,&b10p0Ekin,&b10p0path,
+		&b12p0x,&b12p0tx,&b12p0y,&b12p0ty,&b12p0Ekin,&b12p0path,
+		&b13p1t,&b13p1x,&b13p1y,&b13p1z,&b13p1Ekin
                 };   
             for (size_t i(0); i<sizeof(ps_old)/sizeof(double*); i++) {
                 t->SetBranchAddress(bn_old[i].c_str(),ps_old[i]);  
@@ -2495,31 +2519,86 @@ int main(int argc, char *argv[])
             TBranch *obb2p0tx = tOut->Branch("b2p0tx",&b2p0tx,"b2p0tx/D");
             TBranch *obb2p0y = tOut->Branch("b2p0y",&b2p0y,"b2p0y/D");
             TBranch *obb2p0ty = tOut->Branch("b2p0ty",&b2p0ty,"b2p0ty/D");
-            TBranch *obb2p0t = tOut->Branch("b2p0t",&b2p0t,"b2p0t/D");
             TBranch *obb2p0z = tOut->Branch("b2p0z",&b2p0z,"b2p0z/D");
-            TBranch *obb2p0TP = tOut->Branch("b2p0TP",&b2p0TP,"b2p0TP/D");
             TBranch *obb2p0dE = tOut->Branch("b2p0dE",&b2p0dE,"b2p0dE/D");
             TBranch *obb2p0Ekin = tOut->Branch("b2p0Ekin",&b2p0Ekin,"b2p0Ekin/D");
-            TBranch *obb2p0R_pz = tOut->Branch("b2p0R_pz",&b2p0R_pz,"b2p0R_pz/D");
-            TBranch *obb2p0R_exen = tOut->Branch("b2p0R_exen",&b2p0R_exen,"b2p0R_exen/D");
-            TBranch *obb2p0R_ph = tOut->Branch("b2p0R_ph",&b2p0R_ph,"b2p0R_ph/D");
-            TBranch *obb2p0R_th = tOut->Branch("b2p0R_th",&b2p0R_th,"b2p0R_th/D");
-            TBranch *obb7p0x = tOut->Branch("b7p0x",&b4p0x,"b7p0x/D");
-            TBranch *obb7p0tx = tOut->Branch("b7p0tx",&b4p0tx,"b7p0tx/D");
-            TBranch *obb7p0y = tOut->Branch("b7p0y",&b4p0y,"b7p0y/D");
-            TBranch *obb7p0ty = tOut->Branch("b7p0ty",&b4p0ty,"b7p0ty/D");
-            TBranch *obb7p0t = tOut->Branch("b7p0t",&b4p0t,"b7p0t/D");
-            TBranch *obb7p0Ekin = tOut->Branch("b7p0Ekin",&b4p0Ekin,"b7p0Ekin/D");
-	    TBranch *obb9p0x = tOut->Branch("b9p0x",&b6p0x,"b9p0x/D");
-            TBranch *obb9p0tx = tOut->Branch("b9p0tx",&b6p0tx,"b9p0tx/D");
-            TBranch *obb9p0y = tOut->Branch("b9p0y",&b6p0y,"b9p0y/D");
-            TBranch *obb9p0ty = tOut->Branch("b9p0ty",&b6p0ty,"b9p0ty/D");
-            TBranch *obb9p0Ekin = tOut->Branch("b9p0Ekin",&b6p0Ekin,"b9p0Ekin/D");
-            TBranch *obb13p1t = tOut->Branch("b13p1t",&b9p1t,"b13p1t/D");
-            TBranch *obb13p1x = tOut->Branch("b13p1x",&b9p1x,"b13p1x/D");
-            TBranch *obb13p1y = tOut->Branch("b13p1y",&b9p1y,"b13p1y/D");
-            TBranch *obb13p1z = tOut->Branch("b13p1z",&b9p1z,"b13p1z/D");
-            TBranch *obb13p1Ekin = tOut->Branch("b13p1Ekin",&b9p1Ekin,"b13p1Ekin/D");
+
+            TBranch *obb3p0x = tOut->Branch("b3p0x",&b3p0x,"b3p0x/D");
+            TBranch *obb3p0tx = tOut->Branch("b3p0tx",&b3p0tx,"b3p0tx/D");
+            TBranch *obb3p0y = tOut->Branch("b3p0y",&b3p0y,"b3p0y/D");
+            TBranch *obb3p0ty = tOut->Branch("b3p0ty",&b3p0ty,"b3p0ty/D");
+            TBranch *obb3p0TP = tOut->Branch("b3p0TP",&b3p0TP,"b3p0TP/D");
+            TBranch *obb3p0dE = tOut->Branch("b3p0dE",&b3p0dE,"b3p0dE/D");
+            TBranch *obb3p0Ekin = tOut->Branch("b3p0Ekin",&b3p0Ekin,"b3p0Ekin/D");
+            TBranch *obb3p1Ekin = tOut->Branch("b3p1Ekin",&b3p1Ekin,"b3p1Ekin/D");
+            TBranch *obb3p1tx = tOut->Branch("b3p1tx",&b3p1tx,"b3p1tx/D");
+            TBranch *obb3p1ty = tOut->Branch("b3p1ty",&b3p1ty,"b3p1ty/D");
+
+            TBranch *obb4p0x = tOut->Branch("b4p0x",&b4p0x,"b4p0x/D");
+            TBranch *obb4p0tx = tOut->Branch("b4p0tx",&b4p0tx,"b4p0tx/D");
+            TBranch *obb4p0y = tOut->Branch("b4p0y",&b4p0y,"b4p0y/D");
+            TBranch *obb4p0ty = tOut->Branch("b4p0ty",&b4p0ty,"b4p0ty/D");
+            TBranch *obb4p0z = tOut->Branch("b4p0z",&b4p0z,"b4p0z/D");
+            TBranch *obb4p0dE = tOut->Branch("b4p0dE",&b4p0dE,"b4p0dE/D");
+            TBranch *obb4p0Ekin = tOut->Branch("b4p0Ekin",&b4p0Ekin,"b4p0Ekin/D");
+
+            TBranch *obb5p0x = tOut->Branch("b5p0x",&b5p0x,"b5p0x/D");
+            TBranch *obb5p0tx = tOut->Branch("b5p0tx",&b5p0tx,"b5p0tx/D");
+            TBranch *obb5p0y = tOut->Branch("b5p0y",&b5p0y,"b5p0y/D");
+            TBranch *obb5p0ty = tOut->Branch("b5p0ty",&b5p0ty,"b5p0ty/D");
+            TBranch *obb5p0TP = tOut->Branch("b5p0TP",&b5p0TP,"b5p0TP/D");
+            TBranch *obb5p0dE = tOut->Branch("b5p0dE",&b5p0dE,"b5p0dE/D");
+            TBranch *obb5p0Ekin = tOut->Branch("b5p0Ekin",&b5p0Ekin,"b5p0Ekin/D");
+            TBranch *obb5p1Ekin = tOut->Branch("b5p1Ekin",&b5p1Ekin,"b5p1Ekin/D");
+            TBranch *obb5p1tx = tOut->Branch("b5p1tx",&b5p1tx,"b5p1tx/D");
+            TBranch *obb5p1ty = tOut->Branch("b5p1ty",&b5p1ty,"b5p1ty/D");
+
+            TBranch *obb6p0x = tOut->Branch("b6p0x",&b6p0x,"b6p0x/D");
+            TBranch *obb6p0tx = tOut->Branch("b6p0tx",&b6p0tx,"b6p0tx/D");
+            TBranch *obb6p0y = tOut->Branch("b6p0y",&b6p0y,"b6p0y/D");
+            TBranch *obb6p0ty = tOut->Branch("b6p0ty",&b6p0ty,"b6p0ty/D");
+            TBranch *obb6p0z = tOut->Branch("b6p0z",&b6p0z,"b6p0z/D");
+            TBranch *obb6p0dE = tOut->Branch("b6p0dE",&b6p0dE,"b6p0dE/D");
+            TBranch *obb6p0Ekin = tOut->Branch("b6p0Ekin",&b6p0Ekin,"b6p0Ekin/D");
+
+            TBranch *obb7p0x = tOut->Branch("b7p0x",&b7p0x,"b7p0x/D");
+            TBranch *obb7p0tx = tOut->Branch("b7p0tx",&b7p0tx,"b7p0tx/D");
+            TBranch *obb7p0y = tOut->Branch("b7p0y",&b7p0y,"b7p0y/D");
+            TBranch *obb7p0ty = tOut->Branch("b7p0ty",&b7p0ty,"b7p0ty/D");
+            TBranch *obb7p0TP = tOut->Branch("b7p0TP",&b7p0TP,"b7p0TP/D");
+            TBranch *obb7p0dE = tOut->Branch("b7p0dE",&b7p0dE,"b7p0dE/D");
+            TBranch *obb7p0Ekin = tOut->Branch("b7p0Ekin",&b7p0Ekin,"b7p0Ekin/D");
+            TBranch *obb7p1Ekin = tOut->Branch("b7p1Ekin",&b7p1Ekin,"b7p1Ekin/D");
+            TBranch *obb7p1tx = tOut->Branch("b7p1tx",&b7p1tx,"b7p1tx/D");
+            TBranch *obb7p1ty = tOut->Branch("b7p1ty",&b7p1ty,"b7p1ty/D");
+
+            TBranch *obb8p0x = tOut->Branch("b8p0x",&b8p0x,"b8p0x/D");
+            TBranch *obb8p0tx = tOut->Branch("b8p0tx",&b8p0tx,"b8p0tx/D");
+            TBranch *obb8p0y = tOut->Branch("b8p0y",&b8p0y,"b8p0y/D");
+            TBranch *obb8p0ty = tOut->Branch("b8p0ty",&b8p0ty,"b8p0ty/D");
+            TBranch *obb8p0z = tOut->Branch("b8p0z",&b8p0z,"b8p0z/D");
+            TBranch *obb8p0dE = tOut->Branch("b8p0dE",&b8p0dE,"b8p0dE/D");
+            TBranch *obb8p0Ekin = tOut->Branch("b8p0Ekin",&b8p0Ekin,"b8p0Ekin/D");
+
+            TBranch *obb10p0x = tOut->Branch("b10p0x",&b10p0x,"b10p0x/D");
+            TBranch *obb10p0tx = tOut->Branch("b10p0tx",&b10p0tx,"b10p0tx/D");
+            TBranch *obb10p0y = tOut->Branch("b10p0y",&b10p0y,"b10p0y/D");
+            TBranch *obb10p0ty = tOut->Branch("b10p0ty",&b10p0ty,"b10p0ty/D");
+            TBranch *obb10p0Ekin = tOut->Branch("b10p0Ekin",&b10p0Ekin,"b10p0Ekin/D");
+	    TBranch *obb12p0x = tOut->Branch("b12p0x",&b12p0x,"b12p0x/D");
+            TBranch *obb12p0tx = tOut->Branch("b12p0tx",&b12p0tx,"b12p0tx/D");
+            TBranch *obb12p0y = tOut->Branch("b12p0y",&b12p0y,"b12p0y/D");
+            TBranch *obb12p0ty = tOut->Branch("b12p0ty",&b12p0ty,"b12p0ty/D");
+            TBranch *obb12p0Ekin = tOut->Branch("b12p0Ekin",&b12p0Ekin,"b12p0Ekin/D");
+
+
+
+	    //keep these too
+            TBranch *obb13p1t = tOut->Branch("b13p1t",&b13p1t,"b13p1t/D");
+            TBranch *obb13p1x = tOut->Branch("b13p1x",&b13p1x,"b13p1x/D");
+            TBranch *obb13p1y = tOut->Branch("b13p1y",&b13p1y,"b13p1y/D");
+            TBranch *obb13p1z = tOut->Branch("b13p1z",&b13p1z,"b13p1z/D");
+            TBranch *obb13p1Ekin = tOut->Branch("b13p1Ekin",&b13p1Ekin,"b13p1Ekin/D");
 
             // And add in the new Geant parameters... note that they are simply pg instead of p
             tOut->Branch("b13pgmultiplicity",&multiplicity,"b13pgmultiplicity/I");

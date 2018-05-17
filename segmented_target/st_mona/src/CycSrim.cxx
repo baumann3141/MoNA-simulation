@@ -115,7 +115,7 @@ Int_t CycSrim::Init() {
    ifstream stoppingFile;
    const Char_t *srimFile;
 //   srimFile = Form("/projects/mona-sim/jonesm/st_mona/bin/srim/%s",srimfile[fMaterial]); cout << "DataDir: " << srimFile << endl;
-   srimFile = Form("/projects/mona-sim/baumann/st_mona/bin/srim/%s",srimfile[fMaterial]); cout << "DataDir: " << srimFile << endl;
+   srimFile = Form("/projects/mona-sim/baumann/segmented_target/st_mona/bin/srim/%s",srimfile[fMaterial]); cout << "DataDir: " << srimFile << endl;
    // something funny happened with the GetSrimDataDir() function when updating to wheezy, it doesn't appear to be returning the string its suppsoed to. 8/9/13
    stoppingFile.open(srimFile,ios::in);
 
