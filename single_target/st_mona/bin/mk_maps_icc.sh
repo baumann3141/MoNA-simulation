@@ -230,11 +230,11 @@ echo "// partial inverse map"
 mkMapEntry m12B_e15091i  12  5  1.5791  2.25474 /projects/e15091/analysis_master/maps/Z5_A12_Bp2.25474_12B.imap
 
 echo "// forward map"
-mkMapEntry m8He_11Be_e15091  8  2  1.5791  3.80893  /projects/e15091/analysis_master/maps/Z2_A8_Bp3.80893_11Be.map
+mkMapEntry m8He_11Be_e15091  12  4  1.5791  3.806925  /projects/mona-sim/baumann/single_target/st_mona/maps/Z4_A12_Bp3.806925.map
 echo "// partial inverse map"
-mkMapEntry m8He_11Be_e15091i  8  2  1.5791  3.80893 /projects/e15091/analysis_master/maps/Z2_A8_Bp3.80893_11Be.imap
+mkMapEntry m8He_11Be_e15091i  12  4  1.5791  3.806925 /projects/mona-sim/baumann/single_target/st_mona/maps/Z4_A12_Bp3.806925.imap
 
 echo "// forward map"
-mkMapEntry m8He_12B_e15091  8  2  1.5791  3.806925  /projects/e15091/analysis_master/maps/Z2_A8_Bp3.806925_12B.map
+mkMapEntry m8He_12B_e15091  12  4  1.5791  3.806925  /projects/mona-sim/baumann/single_target/st_mona/maps/Z4_A12_Bp3.806925.map
 echo "// partial inverse map"
-mkMapEntry m8He_12B_e15091i  8  2  1.5791  3.806925 /projects/e15091/analysis_master/maps/Z2_A8_Bp3.806925_12B.imap
+mkMapEntry m8He_12B_e15091i  12  4  1.5791  3.806925 /projects/mona-sim/baumann/single_target/st_mona/maps/Z4_A12_Bp3.806925.imap

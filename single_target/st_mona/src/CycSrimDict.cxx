@@ -6,7 +6,6 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <math.h>
 #include <string.h>
 #include <assert.h>
 #define G__DICTIONARY
@@ -38,7 +37,7 @@
 namespace std {} using namespace std;
 
 // Header files passed as explicit arguments
-#include "../include/CycSrim.h"
+#include "/projects/mona-sim/baumann/single_target/st_mona/src/../include/CycSrim.h"
 
 // Header files passed via #pragma extra_include
 
@@ -56,7 +55,7 @@ namespace ROOT {
       static ::TVirtualIsAProxy* isa_proxy = new ::TInstrumentedIsAProxy< ::CycSrim >(0);
       static ::ROOT::TGenericClassInfo 
          instance("CycSrim", ::CycSrim::Class_Version(), "../include/CycSrim.h", 87,
-                  typeid(::CycSrim), DefineBehavior(ptr, ptr),
+                  typeid(::CycSrim), ::ROOT::Internal::DefineBehavior(ptr, ptr),
                   &::CycSrim::Dictionary, isa_proxy, 4,
                   sizeof(::CycSrim) );
       instance.SetNew(&new_CycSrim);
@@ -149,12 +148,12 @@ namespace {
 0
     };
     static const char* includePaths[] = {
-"/mnt/misc/sw/x86_64/Debian/8/root/gnu/6.04.02/include/root",
+"/mnt/misc/sw/x86_64/Debian/8/root/gnu/6.08.00/include",
 "/projects/mona-sim/baumann/single_target/st_mona/src/",
 0
     };
-    static const char* fwdDeclCode = 
-R"DICTFWDDCLS(
+    static const char* fwdDeclCode = R"DICTFWDDCLS(
+#line 1 "CycSrimDict dictionary forward declarations' payload"
 #pragma clang diagnostic ignored "-Wkeyword-compat"
 #pragma clang diagnostic ignored "-Wignored-attributes"
 #pragma clang diagnostic ignored "-Wreturn-type-c-linkage"
@@ -162,6 +161,7 @@ extern int __Cling_Autoloading_Map;
 class __attribute__((annotate(R"ATTRDUMP(SRIM)ATTRDUMP"))) __attribute__((annotate("$clingAutoload$../include/CycSrim.h")))  CycSrim;
 )DICTFWDDCLS";
     static const char* payloadCode = R"DICTPAYLOAD(
+#line 1 "CycSrimDict dictionary payload"
 
 #ifndef G__VECTOR_HAS_CLASS_ITERATOR
   #define G__VECTOR_HAS_CLASS_ITERATOR 1

@@ -2,7 +2,7 @@
 FileName="PAC42"
 
 #arguments="-n 100000 -f root -geant -reac glaub -e swave 0.50164 9.0 -be 43.2733 -bZ 4 -bA 11 -glaub 4 -strag 1 -nn 0 -np 2"
-arguments="-n 1000000 -f root -geant -reac 2body -32.5 0.3 -e swave 0.50164 9.0 -be 43.2733 -bZ 4 -bA 11 -strag 1 -nn 0 -np 2"
+arguments="-n 10000 -f root -geant -reac glaub -e asymbw 0.50 0.150 1 0 -be 76.0 -bZ 4 -bA 14 -strag 1 -nn 1 -np 0"
 
 # For GEANT simulation through Python script control.py (-n number of neutrons).
 controlargs="-n 1"

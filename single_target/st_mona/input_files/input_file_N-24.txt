@@ -1,0 +1,35 @@
+#INFO("PAC42 N-24 from F-26 by -2p");
+	reacType	=	"glaub"; 
+	eBeam		=	100.0; # MeV/u
+	beamA		=	26;
+	beamZ		=	9;
+	dTarget 	=	700.0; # mg/cm^2
+	dEbeam		=	0.056;# 5.6 MeV at 2.5%
+	resTime		=	0.3; # ns
+	nNeutr		=	0;
+	nProt		=	2;
+	bSpotCx		=	-0.00000; # m
+	bSpotCtx	=	-0.00000; # rad
+	bSpotCy		=	-0.00000; # m
+	bSpotCty	=	0.000000; # rad
+	bSpotDx		=	0.005000; # m
+	bSpotDy		=	0.005000; # m
+	bSpotDtx	=	0.010000; # rad
+	bSpotDty	=	0.010000; # rad 
+	bSpotSxtx	=	0.000000; # sqrt(m * rad)
+	bSpotSyty	=	0.000000; # sqrt(m * rad)
+	crdc1MaskLeft	=	0.15; # m
+	crdc1MaskRight	=	-0.15; # m
+	crdc2MaskLeft	=	0.15; # m
+	crdc2MaskRight	=	-0.15; # m
+	crdc2MaskTop	=	0.15; # m
+	crdc2MaskBot	=	-0.15; # m
+	crdc2dist	=	1.549; # m
+	cosymap		= 	"m8He_11Be_e15091";
+	fragA		=	12;
+	fragZ		=	4;
+	targA		=	9;
+	targZ		=	4;
+	maxbulge 	= 	0.0000000000000001; # m
+	tflatfoil	=	0.0000000000000001;
+

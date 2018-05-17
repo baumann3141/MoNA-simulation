@@ -330,7 +330,7 @@ int main (size_t argc, char** argv) {
   double normscale2 = 1;
   //////////////////////  ANK: end of new parameters                         //
   double crdc2dist = 1.529;                                   // distance between CRDC1 and 2
-  double monaDist = 8.17;                                     // distance to middle of A8
+  double monaDist = 4.55;                                     // distance to middle of A8
   double crdc1MaskLeft  =  0.15;                              //
   double crdc1MaskRight = -0.15;                              // 
   double crdc2MaskLeft  =  0.15;                              //

@@ -6,7 +6,6 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <math.h>
 #include <string.h>
 #include <assert.h>
 #define G__DICTIONARY
@@ -38,7 +37,7 @@
 namespace std {} using namespace std;
 
 // Header files passed as explicit arguments
-#include "../include/mona_analysis.hh"
+#include "/projects/mona-sim/baumann/single_target/st_mona/src/../include/mona_analysis.hh"
 
 // Header files passed via #pragma extra_include
 
@@ -57,7 +56,7 @@ namespace ROOT {
       static ::TVirtualIsAProxy* isa_proxy = new ::TInstrumentedIsAProxy< ::MonaAnalyzedEvent >(0);
       static ::ROOT::TGenericClassInfo 
          instance("MonaAnalyzedEvent", ::MonaAnalyzedEvent::Class_Version(), "../include/mona_analysis.hh", 22,
-                  typeid(::MonaAnalyzedEvent), DefineBehavior(ptr, ptr),
+                  typeid(::MonaAnalyzedEvent), ::ROOT::Internal::DefineBehavior(ptr, ptr),
                   &::MonaAnalyzedEvent::Dictionary, isa_proxy, 16,
                   sizeof(::MonaAnalyzedEvent) );
       instance.SetNew(&new_MonaAnalyzedEvent);
@@ -380,12 +379,12 @@ namespace {
 0
     };
     static const char* includePaths[] = {
-"/mnt/misc/sw/x86_64/Debian/8/root/gnu/6.04.02/include/root",
+"/mnt/misc/sw/x86_64/Debian/8/root/gnu/6.08.00/include",
 "/projects/mona-sim/baumann/single_target/st_mona/src/",
 0
     };
-    static const char* fwdDeclCode = 
-R"DICTFWDDCLS(
+    static const char* fwdDeclCode = R"DICTFWDDCLS(
+#line 1 "monaAnaDict dictionary forward declarations' payload"
 #pragma clang diagnostic ignored "-Wkeyword-compat"
 #pragma clang diagnostic ignored "-Wignored-attributes"
 #pragma clang diagnostic ignored "-Wreturn-type-c-linkage"
@@ -393,6 +392,7 @@ extern int __Cling_Autoloading_Map;
 class __attribute__((annotate("$clingAutoload$../include/mona_analysis.hh")))  MonaAnalyzedEvent;
 )DICTFWDDCLS";
     static const char* payloadCode = R"DICTPAYLOAD(
+#line 1 "monaAnaDict dictionary payload"
 
 #ifndef G__VECTOR_HAS_CLASS_ITERATOR
   #define G__VECTOR_HAS_CLASS_ITERATOR 1
